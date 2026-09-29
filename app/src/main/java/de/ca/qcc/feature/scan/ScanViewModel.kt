@@ -203,23 +203,36 @@ class ScanViewModel @Inject constructor(
     // Called for both hardware trigger and UI button results
     private fun handleRfid(epc: String) {
         val status = _uiState.value.readerStatus
-        val parsed = parser.parseEpcToSgtin(
-            epc = epc,
-            readerName = status.readerName,
-            battery = status.batteryPercent
-        )
-        _uiState.value = _uiState.value.copy(
-            rfid = parsed,
-            error = null,
-            isScanning = false
-        )
-        signalScan()
-        compareIfReady()
+        runCatching {
+            parser.parseEpcToSgtin(
+                epc = epc,
+                readerName = status.readerName,
+                battery = status.batteryPercent
+            )
+        }
+            .onSuccess { parsed ->
+                startNewCycleIfNeeded()
+                _uiState.value = _uiState.value.copy(
+                    rfid = parsed,
+                    error = null,
+                    isScanning = false
+                )
+                signalScan()
+                compareIfReady()
+            }
+            .onFailure { ex ->
+                _uiState.value = _uiState.value.copy(
+                    error = ex.message ?: "RFID-Fehler",
+                    isScanning = false
+                )
+            }
     }
 
     private fun handleQr(raw: String) {
         runCatching { parser.parseQr(raw) }
             .onSuccess { parsed ->
+                // CT37 hardware key bypasses triggerQrScan(), so clear a finished cycle here
+                startNewCycleIfNeeded()
                 _uiState.value = _uiState.value.copy(
                     qr = parsed,
                     // rfid bleibt erhalten

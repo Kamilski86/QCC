@@ -30,7 +30,7 @@ class Gs1ParserServiceTest2 {
         val result = parser.parseEpcToSgtin("3014F824285A980300000006")
 
         assertEquals("3014F824285A980300000006", result.epc)
-        assertEquals("urn:epc:id:sgtin:4065546.092768.12884901894", result.sgtin)
+        assertEquals("4065546.092768.12884901894", result.sgtin)
         assertEquals("04065546927682", result.gtin)
     }
 

@@ -15,27 +15,16 @@ class CompareScansUseCase @Inject constructor(
         qr: QrScanResult,
         rfid: RfidScanResult
     ): ComparisonResult {
-        if (qr.serial == null) return ComparisonResult(
-            status = ComparisonStatus.MISMATCH,
-            message = "QR enthält keine Seriennummer"
-        )
-
-        val qrSgtin = qr.sgtin
-            ?: return ComparisonResult(
-                status = ComparisonStatus.MISMATCH,
-                message = "QR-SGTIN konnte nicht aufgebaut werden"
-            )
-
-        val qrNormalized = qrSgtin.trim().lowercase()
+        val qrNormalized = qr.sgtin?.trim()?.lowercase()
         val rfidNormalized = rfid.sgtin.trim().lowercase()
 
-        val isMatch = qrNormalized == rfidNormalized
+        val isMatch = qr.serial != null && qrNormalized == rfidNormalized
 
         mismatchRepository.addScan(
             gtinQr = qr.gtin,
             gtinTag = rfid.gtin,
             isMatch = isMatch,
-            sgtinQr = qrNormalized,
+            sgtinQr = qrNormalized.orEmpty(),
             sgtinTag = rfidNormalized,
             qrRaw = qr.rawValue
         )
@@ -58,7 +47,11 @@ class CompareScansUseCase @Inject constructor(
 
             ComparisonResult(
                 status = ComparisonStatus.MISMATCH,
-                message = "SGTIN stimmt nicht überein"
+                message = when {
+                    qr.serial == null -> "QR enthält keine Seriennummer"
+                    qrNormalized == null -> "QR-SGTIN konnte nicht aufgebaut werden"
+                    else -> "SGTIN stimmt nicht überein"
+                }
             )
         }
     }
