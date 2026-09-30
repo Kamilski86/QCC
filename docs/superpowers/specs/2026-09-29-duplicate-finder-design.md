@@ -1,7 +1,7 @@
 # Design: Duplikatsuche („Find duplicates“)
 
 - Datum: 2026-09-29
-- Status: Freigegeben, angepasst nach Hardware-Spike (2026-09-30)
+- Status: Umgesetzt und auf CT37 + RFD8500 abgenommen (2026-09-30); Test mit zwei gleichzeitig gehaltenen Duplikaten steht noch aus
 - Scope: Neuer Use Case in der QCC-App (Honeywell CT37 + Zebra RFD8500)
 
 ## 1) Problem und Ziel
@@ -103,7 +103,7 @@ Der Duplikat-Bildschirm setzt den Modus beim Öffnen und setzt ihn **beim Verlas
 
 ## 5) Daten und Export
 
-Room-Migration **6 → 7**, zwei neue Tabellen; bestehende Tabellen bleiben unverändert.
+Room-Migration **6 → 7**, zwei neue Tabellen; bestehende Tabellen bleiben unverändert. Es ist immer nur **eine** Suche offen: `startSearch` schließt eine noch offene Vorgängersuche ohne Export.
 
 `duplicate_searches`
 
@@ -129,7 +129,7 @@ Room-Migration **6 → 7**, zwei neue Tabellen; bestehende Tabellen bleiben unve
 
 - **Fortsetzen:** Existiert beim Öffnen des Bildschirms eine Suche mit `endedAt = null`, startet der Bildschirm direkt in Phase 2 dieser Suche.
 - **Filiale:** letzter Wert in `SharedPreferences`.
-- **CSV:** Dateiname `duplicates_yyyyMMdd_HHmmss.csv`, Ablage im Documents-Verzeichnis (gleicher Mechanismus wie `MismatchRepository.exportPendingCsv`). Spaltenköpfe immer Englisch: `Timestamp,SGTIN,EPC,TID,Find No,Store`. Eine Zeile pro Fund der beendeten Suche. Bei 0 Funden wird keine Datei erzeugt, Meldung „No duplicates found – nothing exported“.
+- **CSV:** Dateiname `duplicates_yyyyMMdd_HHmmss_<searchId>.csv`, Ablage im Documents-Verzeichnis (gleicher Mechanismus wie `MismatchRepository.exportPendingCsv`). Spaltenköpfe immer Englisch: `Timestamp,SGTIN,EPC,TID,Find No,Store`. Eine Zeile pro Fund der beendeten Suche. `finishSearch` ist idempotent (bei bereits beendeter Suche wird der gespeicherte Dateiname zurückgegeben) und schreibt die CSV vor dem Schließen der Suche, sodass ein fehlgeschlagener Export wiederholbar ist. Bei 0 Funden wird keine Datei erzeugt, Meldung „No duplicates found – nothing exported“.
 
 ## 6) Rückmeldung (Ton und Vibration)
 

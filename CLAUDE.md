@@ -26,7 +26,7 @@ This is an Android project built with Gradle. All commands run from the repo roo
 ./gradlew clean
 ```
 
-There is no emulator target — the app requires physical Honeywell CT37 (barcode) and Zebra RFD8500 (RFID) hardware. There are no instrumented tests currently.
+There is no emulator target — the app requires physical Honeywell CT37 (barcode) and Zebra RFD8500 (RFID) hardware. There are no instrumented tests currently. Unit tests use Robolectric + in-memory Room (see `app/src/test/.../testutil`). `./gradlew lintDebug` currently crashes in this environment with "Exception occurred when reading Kotlin metadata" (also on the pre-feature baseline commit 499466a) — known issue, not caused by the duplicate finder.
 
 ## Architecture Overview
 
@@ -38,10 +38,12 @@ There is no emulator target — the app requires physical Honeywell CT37 (barcod
 app/                     — Activity, Hilt entry point, NavHost, drawer
 navigation/              — Screen sealed class (route definitions)
 feature/{name}/          — Screen composable + ViewModel per use case
+feature/duplicates/      — Duplicate finder: screen + ViewModel + proximity feedback (tone/vibration, gauge)
 domain/model/            — Shared data classes (Models.kt, all @Serializable)
 domain/usecase/          — Business logic (UseCases.kt)
 data/local/              — Room: Entities, Daos, Migrations, AppDatabase
-data/repository/         — MismatchRepository (bridges Room + CSV export)
+data/repository/         — MismatchRepository (bridges Room + CSV export), DuplicateSearchRepository
+data/export/             — CsvDocumentWriter (shared CSV file writer)
 device/honeywell/        — HoneywellCt37ScannerGateway (barcode, via AIDC SDK AAR)
 device/zebra/            — ZebraRfd8500Gateway + RfidReaderGateway interface (RFID, via Zebra SDK AAR)
 core/gs1/                — Gs1ParserService (GS1/EPC parsing, pure Kotlin, no Android deps)
@@ -56,7 +58,7 @@ Vendor SDKs (Honeywell AIDC, Zebra RFID) are local AARs in `app/libs/` and `vend
 
 **Hardware gateways are @Singleton.** `ZebraRfd8500Gateway` auto-connects to the first discovered Bluetooth reader in `ScanViewModel.init{}`. `HoneywellCt37ScannerGateway` is lifecycle-managed directly in `MainActivity` (`onResume`/`onPause`/`onDestroy` → `claim`/`release`/`close`). Both gateways emit results as `Flow` — hardware events arrive on SDK threads and are emitted via `MutableSharedFlow.tryEmit()`.
 
-**Zebra gateway is single-tag mode by design.** `ZebraRfd8500Gateway` uses an `AtomicBoolean inventoryActive` to emit exactly one EPC per inventory session, then stops immediately. This is intentional for the QCC use case (one item at a time). A multi-tag collection mode does not exist yet.
+**Zebra gateway is single-tag mode by design.** `ZebraRfd8500Gateway` uses an `AtomicBoolean inventoryActive` to emit exactly one EPC per inventory session, then stops immediately. This is intentional for the QCC use case (one item at a time). A multi-tag collection mode does not exist yet. The gateway also has trigger modes (`TriggerMode`: QCC / CAPTURE / LOCATE); only QCC runs the single-tag inventory and emits `observeTriggerEvents()`, so `ScanViewModel` is unchanged. CAPTURE/LOCATE (duplicate finder) use `observeHandheldTrigger()`, `TagLocationing`, and nearby reads (`readEpcsNearby`, `readTidsNearby`) at 5 % of the power table (verified on hardware); the TID is read with 96 bit. Hardware finding: the RFD8500 accepts only locate masks that are contiguous from the MSB, so locating is always exact (`LocateTarget.FULL_MASK`); typed SGTINs use a selectable filter value (default 1). `setTriggerMode(QCC)` stops an active locate.
 
 **GS1 parsing is fully in `Gs1ParserService`.** It handles:
 - GS1 DataMatrix QR codes (`/01/{GTIN-14}/21/{serial}`) → `QrScanResult`
@@ -68,15 +70,15 @@ SSCC (Application Identifier `00`, 18 digits) parsing does **not** exist yet.
 
 ### Navigation
 
-Routes are defined in `navigation/Nav.kt` as a sealed class. Hard-coded string routes (`"reader"`, `"language"`, `"about"`) are also used directly in `MainActivity`. The app currently goes `Splash → Dashboard` with a `ModalNavigationDrawer` providing access to settings screens.
+Routes are defined in `navigation/Nav.kt` as a sealed class. Hard-coded string routes (`"reader"`, `"language"`, `"about"`) are also used directly in `MainActivity`. The app currently goes `Splash → Dashboard` with a `ModalNavigationDrawer` providing access to settings screens and the duplicate finder (route `"duplicates"`). Its `DuplicateSearchViewModel` is destination-scoped (the model for future use-case screens); `onScreenStopped()` on ON_STOP/dispose resets the trigger mode to QCC. The keyboard mode is switched to ADJUST_RESIZE only while this screen is active (otherwise ADJUST_NOTHING).
 
 ### Database
 
-Room DB (`qcc.db`) is currently at schema version 6. Two tables: `scans` (every comparison result) and `mismatches` (mismatch-only subset). Migrations live in `data/local/Migrations.kt`. SQLite on API < 35 has no `DROP COLUMN` — recreate-table pattern is used (see `MIGRATION_5_6`).
+Room DB (`qcc.db`) is currently at schema version 7. Four tables: `scans` (every comparison result), `mismatches` (mismatch-only subset), `duplicate_searches` and `duplicate_finds` (duplicate finder; TID is globally unique, so finds keep one row per physical tag). Migrations live in `data/local/Migrations.kt`. SQLite on API < 35 has no `DROP COLUMN` — recreate-table pattern is used (see `MIGRATION_5_6`).
 
 ### String localization
 
-Three locale variants: `values/` (EN), `values-de/` (DE), `values-pl/` (PL). All user-visible strings must be added to all three files.
+Three locale variants: `values/` (EN), `values-de/` (DE), `values-pl/` (PL). All user-visible strings must be added to all three files. The app default language is English (`values/`). The duplicate finder adds `dup_*` keys in EN/DE/PL; its ViewModel returns typed messages (`DuplicateMessage`) that the UI localizes.
 
 ## Workflow Orchestration
 

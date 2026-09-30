@@ -18,3 +18,4 @@ vendor/zebra/HHSampleApp/
 vendor/zebra/ZIOTCSampleApp/
 
 .superpowers/
+.kotlin/

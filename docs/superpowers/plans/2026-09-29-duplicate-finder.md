@@ -777,7 +777,7 @@ Die Spec ist entsprechend aktualisiert (Abschnitte 3, 4, 5, 8, 10).
 
 ---
 
-### Task 4: Room – Tabellen, DAO, Migration 6 → 7
+### Task 4: Room – Tabellen, DAO, Migration 6 → 7 (erledigt)
 
 **Files:**
 - Modify: `app/build.gradle.kts`
@@ -1034,7 +1034,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 5: CSV-Writer extrahieren und DuplicateSearchRepository
+### Task 5: CSV-Writer extrahieren und DuplicateSearchRepository (erledigt)
 
 **Files:**
 - Create: `app/src/main/java/de/ca/qcc/data/export/CsvDocumentWriter.kt`
@@ -1406,7 +1406,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 6: Näherungs-Feedback und Filial-Speicher
+### Task 6: Näherungs-Feedback und Filial-Speicher (erledigt)
 
 **Files:**
 - Create: `app/src/main/java/de/ca/qcc/feature/duplicates/ProximityFeedback.kt`
@@ -1611,7 +1611,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 7: DuplicateSearchViewModel
+### Task 7: DuplicateSearchViewModel (erledigt)
 
 **Files:**
 - Modify: `app/src/test/java/de/ca/qcc/testutil/DuplicateFakes.kt`
@@ -2342,7 +2342,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 8: Texte EN/DE/PL
+### Task 8: Texte EN/DE/PL (erledigt)
 
 **Files:**
 - Modify: `app/src/main/res/values/strings.xml`
@@ -2482,7 +2482,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 9: UI – Tacho und Bildschirm
+### Task 9: UI – Tacho und Bildschirm (erledigt)
 
 **Files:**
 - Create: `app/src/main/java/de/ca/qcc/feature/duplicates/ProximityGauge.kt`
@@ -2939,7 +2939,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 10: Navigation und Drawer
+### Task 10: Navigation und Drawer (erledigt)
 
 **Files:**
 - Modify: `app/src/main/java/de/ca/qcc/navigation/Nav.kt`
@@ -3040,7 +3040,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 11: Gesamtverifikation und Hardware-Abnahme
+### Task 11: Gesamtverifikation und Hardware-Abnahme (erledigt)
 
 **Files:** keine Codeänderung erwartet.
 
@@ -3093,7 +3093,7 @@ Jede fehlgeschlagene Prüfung → mit `superpowers:systematic-debugging` Ursache
 
 ---
 
-### Task 12: Dokumentation nachziehen
+### Task 12: Dokumentation nachziehen (erledigt)
 
 Die Spec wurde bereits nach dem Hardware-Spike (2026-09-30) an die Umsetzung angeglichen: SGTIN-Filterwert 1 mit Auswahl 0–7 und exakter Suche, Nahbereichs-Lesen mit 5 % der Maximalleistung, TID 96 Bit, Trigger-Weiterleitung im Gateway (`ScanViewModel` unverändert), sofortiges Anlesen per Trigger in Phase 1, keine eigene Spalte für Filter-Maskierung in `duplicate_searches`, Spike-Ergebnis bei R1. Hier bleibt nur der Abschluss.
 
