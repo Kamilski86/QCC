@@ -320,7 +320,9 @@ class ZebraRfd8500Gateway @Inject constructor(
     }
 
     private fun nearbyPowerIndex() =
-        (maxPowerIndex * NEARBY_POWER_PERCENT / 100).coerceIn(MIN_NEARBY_POWER_INDEX, maxPowerIndex)
+        (maxPowerIndex * NEARBY_POWER_PERCENT / 100)
+            .coerceAtLeast(MIN_NEARBY_POWER_INDEX)
+            .coerceAtMost(maxPowerIndex)
 
     private companion object {
         const val NEARBY_READ_WINDOW_MS = 700L
