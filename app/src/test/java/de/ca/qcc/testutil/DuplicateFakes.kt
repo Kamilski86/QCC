@@ -14,7 +14,12 @@ fun inMemoryDb(context: Context): AppDatabase =
 
 class FakeCsvWriter : CsvDocumentWriter {
     val files = mutableMapOf<String, String>()
+    var failNext = false
     override suspend fun write(fileName: String, content: String) {
+        if (failNext) {
+            failNext = false
+            throw java.io.IOException("write failed")
+        }
         files[fileName] = content
     }
 }

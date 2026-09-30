@@ -65,14 +65,16 @@ class DuplicateSearchRepository @Inject constructor(
         }
     }
 
-    // Returns the exported file name, or null when the search had no finds
+    // Idempotent. Returns the exported file name, or null when the search had no finds.
+    // The CSV is written before the search is closed, so a failed export can be retried.
     suspend fun finishSearch(searchId: Long): String? {
         val search = dao.getSearch(searchId) ?: return null
+        if (search.endedAt != null) return search.exportFileName
         val finds = dao.getFinds(searchId)
         val fileName = if (finds.isEmpty()) {
             null
         } else {
-            val name = "duplicates_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.csv"
+            val name = "duplicates_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}_$searchId.csv"
             csvWriter.write(name, buildDuplicatesCsv(search, finds))
             name
         }

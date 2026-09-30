@@ -82,7 +82,7 @@ class DuplicateSearchRepositoryTest {
 
         val fileName = repository.finishSearch(id)!!
 
-        assertTrue(fileName.matches(Regex("""duplicates_\d{8}_\d{6}\.csv""")))
+        assertTrue(fileName.matches(Regex("""duplicates_\d{8}_\d{6}_\d+\.csv""")))
         val lines = writer.files.getValue(fileName).trim().lines()
         assertEquals("Timestamp,SGTIN,EPC,TID,Find No,Store", lines[0])
         assertEquals(3, lines.size)
@@ -115,5 +115,55 @@ class DuplicateSearchRepositoryTest {
 
         assertEquals(second, repository.getOpenSearch()!!.id)
         assertTrue(db.duplicateDao().getSearch(first)?.endedAt != null)
+    }
+
+    @Test
+    fun finishSearch_twice_returnsSameFileName_andExportsOnce() = runTest {
+        val id = repository.startSearch(target, store = null)
+        repository.registerFind(id, "E280AA")
+
+        val first = repository.finishSearch(id)
+        val second = repository.finishSearch(id)
+
+        assertEquals(first, second)
+        assertEquals(1, writer.files.size)
+    }
+
+    @Test
+    fun finishSearch_whenWriterFails_keepsSearchOpen_andCanBeRetried() = runTest {
+        val id = repository.startSearch(target, store = null)
+        repository.registerFind(id, "E280AA")
+        writer.failNext = true
+
+        var failed = false
+        try {
+            repository.finishSearch(id)
+        } catch (e: java.io.IOException) {
+            failed = true
+        }
+
+        assertTrue(failed)
+        assertTrue(repository.getOpenSearch() != null)
+        val fileName = repository.finishSearch(id)
+        assertTrue(writer.files.containsKey(fileName))
+        assertNull(repository.getOpenSearch())
+    }
+
+    @Test
+    fun finishSearch_escapesStoreNameInCsv() = runTest {
+        val id = repository.startSearch(target, store = "Store \"A\", B")
+        repository.registerFind(id, "E280AA")
+
+        val fileName = repository.finishSearch(id)!!
+
+        assertTrue(writer.files.getValue(fileName).trim().lines()[1].endsWith(",\"Store \"\"A\"\", B\""))
+    }
+
+    @Test
+    fun startSearch_withoutPriorSearch_opensSearch() = runTest {
+        val id = repository.startSearch(target, store = null)
+
+        assertTrue(id > 0)
+        assertEquals(id, repository.getOpenSearch()!!.id)
     }
 }
