@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
+import kotlin.coroutines.cancellation.CancellationException
 
 class ZebraRfd8500Gateway @Inject constructor(
     @ApplicationContext private val context: Context
@@ -63,12 +64,12 @@ class ZebraRfd8500Gateway @Inject constructor(
 
     private val readers: Readers by lazy { Readers(context, ENUM_TRANSPORT.BLUETOOTH) }
     private var availableReaders: List<ReaderDevice> = emptyList()
-    private var reader: RFIDReader? = null
+    @Volatile private var reader: RFIDReader? = null
     private var connectedReaderName: String? = null
     private var eventHandler: EventHandler? = null
 
     // Index into reader's transmit power level table (0 = hardware minimum)
-    private var currentPowerIndex: Int = 0
+    @Volatile private var currentPowerIndex: Int = 0
     private var maxPowerIndex: Int = 200
 
     // Prevents emitting more than one tag per inventory session; thread-safe
@@ -90,6 +91,7 @@ class ZebraRfd8500Gateway @Inject constructor(
     )
 
     private val locateActive = AtomicBoolean(false)
+    private val nearbyActive = AtomicBoolean(false)
 
     // Set while readEpcsNearby()/readTidsNearby() collect; receives every read TagData
     @Volatile private var nearbySink: ((TagData) -> Unit)? = null
@@ -201,6 +203,7 @@ class ZebraRfd8500Gateway @Inject constructor(
         withContext(Dispatchers.IO) {
             runCatching {
                 val r = requireConnectedReader()
+                check(!nearbyActive.get() && !inventoryActive.get()) { "Reader beschäftigt" }
                 if (!locateActive.compareAndSet(false, true)) return@runCatching
                 try {
                     r.Actions.TagLocationing.Perform(epc, mask, null)
@@ -208,7 +211,7 @@ class ZebraRfd8500Gateway @Inject constructor(
                     locateActive.set(false)
                     throw t
                 }
-            }.readableFailure()
+            }.rethrowCancellation().readableFailure()
         }
 
     override suspend fun stopLocate() {
@@ -252,23 +255,49 @@ class ZebraRfd8500Gateway @Inject constructor(
         extract: (TagData) -> String?
     ): Result<List<String>> = withContext(Dispatchers.IO) {
         runCatching {
-            val r = requireConnectedReader()
-            check(!locateActive.get() && !inventoryActive.get()) { "Reader busy" }
-            val found = LinkedHashSet<String>()
-            nearbySink = { tag -> extract(tag)?.let { synchronized(found) { found.add(it.uppercase()) } } }
+            // Only the call that set the flag may reset it
+            check(nearbyActive.compareAndSet(false, true)) { "Reader beschäftigt" }
             try {
-                applyAntennaConfig(r, 0)
-                start(r)
-                delay(NEARBY_READ_WINDOW_MS)
+                val r = requireConnectedReader()
+                check(!locateActive.get() && !inventoryActive.get()) { "Reader beschäftigt" }
+                val found = LinkedHashSet<String>()
+                var powerRestoreError: Throwable? = null
+                nearbySink = { tag -> extract(tag)?.let { synchronized(found) { found.add(it.uppercase()) } } }
+                try {
+                    applyAntennaConfig(r, 0)
+                    start(r)
+                    delay(NEARBY_READ_WINDOW_MS)
+                    check(reader === r && r.isConnected) { "Reader nicht verbunden" }
+                } finally {
+                    // In finally so a cancelled read never leaves the reader running
+                    runCatching { stop(r) }
+                    nearbySink = null
+                    powerRestoreError = restorePower(r)
+                }
+                // Reached only if the read itself succeeded, so an earlier error is never masked
+                powerRestoreError?.let {
+                    throw IllegalStateException("Leistung konnte nicht wiederhergestellt werden", it)
+                }
+                synchronized(found) { found.toList() }
             } finally {
-                // In finally so a cancelled read never leaves the reader running
-                runCatching { stop(r) }
-                nearbySink = null
-                runCatching { applyAntennaConfig(r, currentPowerIndex) }
+                nearbyActive.set(false)
             }
-            synchronized(found) { found.toList() }
-        }.readableFailure()
+        }.rethrowCancellation().readableFailure()
     }
+
+    // Restores the user-selected power (one retry); returns the error if both attempts fail
+    private fun restorePower(r: RFIDReader): Throwable? {
+        // A disconnected reader gets its power re-applied by configureReader() on reconnect
+        if (!runCatching { r.isConnected }.getOrDefault(false)) return null
+        val error = runCatching { applyAntennaConfig(r, currentPowerIndex) }
+            .recoverCatching { applyAntennaConfig(r, currentPowerIndex) }
+            .exceptionOrNull() ?: return null
+        updateReaderStatus("Power-Fehler: ${error.message ?: error.javaClass.simpleName}")
+        return error
+    }
+
+    private fun <T> Result<T>.rethrowCancellation(): Result<T> =
+        onFailure { if (it is CancellationException) throw it }
 
     private fun epcFilter(epc: String, mask: String) = AccessFilter().apply {
         TagPatternA = TagPatternBase().apply {
