@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SettingsInputAntenna
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.HorizontalDivider
@@ -30,6 +31,7 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,6 +45,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -53,6 +58,8 @@ import de.ca.qcc.device.honeywell.HoneywellCt37ScannerGateway
 import de.ca.qcc.feature.about.AboutScreen
 import de.ca.qcc.feature.dashboard.DashboardScreen
 import de.ca.qcc.feature.dashboard.DashboardViewModel
+import de.ca.qcc.feature.duplicates.DuplicateSearchScreen
+import de.ca.qcc.feature.duplicates.DuplicateSearchViewModel
 import de.ca.qcc.feature.export.ExportViewModel
 import de.ca.qcc.feature.language.LanguageScreen
 import de.ca.qcc.feature.reader.ReaderConfigScreen
@@ -161,6 +168,15 @@ private fun AppNav() {
                         }
                     )
                     DrawerItem(
+                        label = stringResource(R.string.find_duplicates),
+                        icon = Icons.Default.Search,
+                        selected = currentRoute == Screen.Duplicates.route,
+                        onClick = {
+                            navController.navigate(Screen.Duplicates.route)
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+                    DrawerItem(
                         label = stringResource(R.string.reader),
                         icon = Icons.Default.SettingsInputAntenna,
                         selected = currentRoute == Screen.Reader.route,
@@ -223,6 +239,48 @@ private fun AppNav() {
                     onReset = { scanViewModel.reset() },
                     onExport = { exportViewModel.exportCsv() },
                     exportMessage = exportState.message,
+                    onOpenDrawer = { scope.launch { drawerState.open() } }
+                )
+            }
+
+            composable(Screen.Duplicates.route) {
+                // Scoped to this destination, unlike the activity-wide QCC view models
+                val duplicateViewModel: DuplicateSearchViewModel = hiltViewModel()
+                val state by duplicateViewModel.uiState.collectAsState()
+                val lifecycleOwner = LocalLifecycleOwner.current
+
+                // Stop locating and hand the trigger back to QCC when leaving or backgrounding.
+                // The destination stays on the back stack when the drawer navigates away, so
+                // leaving composition (onDispose) is what stops it; entering starts it again.
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        when (event) {
+                            Lifecycle.Event.ON_START -> duplicateViewModel.onScreenStarted()
+                            Lifecycle.Event.ON_STOP -> duplicateViewModel.onScreenStopped()
+                            else -> Unit
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                        duplicateViewModel.onScreenStarted()
+                    }
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
+                        duplicateViewModel.onScreenStopped()
+                    }
+                }
+
+                DuplicateSearchScreen(
+                    state = state,
+                    onInputChange = duplicateViewModel::onInputChange,
+                    onSgtinFilterChange = duplicateViewModel::onSgtinFilterChange,
+                    onApplyInput = duplicateViewModel::applyInput,
+                    onCapture = duplicateViewModel::captureFromReader,
+                    onStoreChange = duplicateViewModel::onStoreChange,
+                    onStartSearch = duplicateViewModel::startSearch,
+                    onContinuousChange = duplicateViewModel::setContinuous,
+                    onConfirmFind = duplicateViewModel::confirmFind,
+                    onEndSearch = duplicateViewModel::endSearch,
                     onOpenDrawer = { scope.launch { drawerState.open() } }
                 )
             }
