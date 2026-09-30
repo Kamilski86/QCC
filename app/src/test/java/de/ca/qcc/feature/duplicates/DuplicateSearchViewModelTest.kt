@@ -11,6 +11,7 @@ import de.ca.qcc.testutil.FakeCsvWriter
 import de.ca.qcc.testutil.FakeDuplicateReader
 import de.ca.qcc.testutil.FakeProximityFeedback
 import de.ca.qcc.testutil.inMemoryDb
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -339,5 +340,155 @@ class DuplicateSearchViewModelTest {
 
         vm.onScreenStarted()
         assertEquals(TriggerMode.LOCATE, reader.mode)
+    }
+
+    @Test
+    fun endSearch_exportFailure_keepsSearchOpen_andIsRetryable() {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        reader.tidsNearby = Result.success(listOf(tid))
+        vm.confirmFind()
+        writer.failNext = true
+
+        vm.endSearch()
+
+        assertEquals(DuplicatePhase.SEARCH, vm.uiState.value.phase)
+        assertFalse(vm.uiState.value.busy)
+        assertTrue(vm.uiState.value.message is DuplicateMessage.ExportFailed)
+
+        vm.endSearch()
+
+        assertEquals(DuplicatePhase.TARGET, vm.uiState.value.phase)
+        assertEquals(1, writer.files.size)
+    }
+
+    @Test
+    fun startLocateFailure_resetsLocatingAndContinuous() {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        reader.startLocateResult = Result.failure(IllegalStateException("nope"))
+
+        vm.setContinuous(true)
+
+        assertFalse(vm.uiState.value.locating)
+        assertFalse(vm.uiState.value.continuous)
+        assertEquals(DuplicateMessage.ReaderError("nope"), vm.uiState.value.message)
+    }
+
+    @Test
+    fun proximityWhileNotLocating_isIgnored() = runTest {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+
+        reader.proximity.emit(50)
+
+        assertEquals(0, vm.uiState.value.proximity)
+        assertTrue(feedback.updates.isEmpty())
+    }
+
+    @Test
+    fun releaseBeforeStartCompletes_endsNotLocating() = runTest {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        val gate = CompletableDeferred<Unit>()
+        reader.startGate = gate
+
+        reader.trigger.emit(true)
+        reader.trigger.emit(false)
+        gate.complete(Unit)
+
+        assertFalse(reader.locating)
+        assertFalse(vm.uiState.value.locating)
+    }
+
+    @Test
+    fun pressReleasePress_endsLocating() = runTest {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        val gate = CompletableDeferred<Unit>()
+        reader.startGate = gate
+
+        reader.trigger.emit(true)
+        reader.trigger.emit(false)
+        reader.trigger.emit(true)
+        gate.complete(Unit)
+
+        assertTrue(reader.locating)
+        assertTrue(vm.uiState.value.locating)
+    }
+
+    @Test
+    fun onCleared_restoresQccMode() {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        assertEquals(TriggerMode.LOCATE, reader.mode)
+
+        vm.javaClass.getDeclaredMethod("onCleared").apply { isAccessible = true }.invoke(vm)
+
+        assertEquals(TriggerMode.QCC, reader.mode)
+    }
+
+    @Test
+    fun startSearchCompletingAfterScreenStopped_keepsQccMode() {
+        val vm = createViewModel()
+        vm.onInputChange(epc)
+        vm.applyInput()
+
+        vm.onScreenStopped()
+        vm.startSearch()
+
+        assertEquals(TriggerMode.QCC, reader.mode)
+    }
+
+    @Test
+    fun setContinuous_ignoredInTargetPhase() {
+        val vm = createViewModel()
+
+        vm.setContinuous(true)
+
+        assertFalse(vm.uiState.value.continuous)
+        assertFalse(reader.locating)
+    }
+
+    @Test
+    fun setContinuous_ignoredWhileBusy() = runTest {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        val gate = CompletableDeferred<Unit>()
+        reader.tidsGate = gate
+        vm.confirmFind()
+        assertTrue(vm.uiState.value.busy)
+
+        vm.setContinuous(true)
+
+        assertFalse(vm.uiState.value.continuous)
+        gate.complete(Unit)
+    }
+
+    @Test
+    fun startSearch_calledTwice_createsOneSearch() {
+        val vm = createViewModel()
+        vm.onInputChange(epc)
+        vm.applyInput()
+
+        vm.startSearch()
+        val id = vm.uiState.value.searchId
+        vm.startSearch()
+
+        assertNotNull(id)
+        assertEquals(id, vm.uiState.value.searchId)
+    }
+
+    @Test
+    fun disconnectDuringConfirmFind_clearsContinuous() = runTest {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        vm.setContinuous(true)
+        reader.tidsNearby = Result.success(listOf(tid))
+
+        reader.status.value = reader.status.value.copy(isConnected = false)
+        vm.confirmFind()
+
+        assertFalse(vm.uiState.value.continuous)
     }
 }

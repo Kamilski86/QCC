@@ -3083,6 +3083,9 @@ Expected: `Success`, App startet (DB-Migration 6 → 7 läuft beim Start auf dem
 | 14 | „End search“ | „Exported: duplicates_….csv“; Datei in Documents mit korrekten Spalten |
 | 15 | Zum Dashboard, QCC-Zyklus mit Zebra-Trigger | QCC-Verhalten unverändert |
 | 16 | Sprache Deutsch/Polnisch | alle neuen Texte übersetzt |
+| 17 | Trigger kurz antippen (Drücken+sofort Loslassen) und schnell erneut drücken | Ortung startet/stoppt sauber, Tacho geht auf 0 |
+| 18 | Während der Suche im Menü zu „Reader“ wechseln, dann zum Dashboard | QCC-Zyklus liefert wieder Tags (kein hängender Locate) |
+| 19 | Zurück (Systemtaste) während Ortung läuft | danach QCC-Scan funktioniert |
 
 - [ ] **Step 4: Abweichungen**
 

@@ -8,6 +8,7 @@ import de.ca.qcc.device.zebra.RfidReaderGateway
 import de.ca.qcc.device.zebra.TriggerMode
 import de.ca.qcc.domain.model.ReaderStatus
 import de.ca.qcc.feature.duplicates.ProximityFeedback
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +42,9 @@ class FakeDuplicateReader : RfidReaderGateway {
     var tidsNearby: Result<List<String>> = Result.success(emptyList())
     val locateCalls = mutableListOf<Pair<String, String>>()
     var locating = false
+    var startLocateResult: Result<Unit> = Result.success(Unit)
+    var startGate: CompletableDeferred<Unit>? = null
+    var tidsGate: CompletableDeferred<Unit>? = null
 
     override fun observeStatus(): Flow<ReaderStatus> = status
     override fun observeTagScans(): Flow<String> = emptyFlow()
@@ -54,12 +58,16 @@ class FakeDuplicateReader : RfidReaderGateway {
     override fun observeProximity(): Flow<Int> = proximity
     override suspend fun startLocate(epc: String, mask: String): Result<Unit> {
         locateCalls += epc to mask
-        locating = true
-        return Result.success(Unit)
+        startGate?.await()
+        if (startLocateResult.isSuccess) locating = true
+        return startLocateResult
     }
     override suspend fun stopLocate() { locating = false }
     override suspend fun readEpcsNearby(): Result<List<String>> = epcsNearby
-    override suspend fun readTidsNearby(epc: String, mask: String): Result<List<String>> = tidsNearby
+    override suspend fun readTidsNearby(epc: String, mask: String): Result<List<String>> {
+        tidsGate?.await()
+        return tidsNearby
+    }
 }
 
 class FakeProximityFeedback : ProximityFeedback {
