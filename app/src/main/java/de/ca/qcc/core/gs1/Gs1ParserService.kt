@@ -147,8 +147,9 @@ class Gs1ParserService {
             }
             normalized.matches(Regex("""^\d+\.\d+\.\d+$""")) -> {
                 val (gcp, itemRef, serial) = normalized.split('.')
+                val parsed = parseEpcToSgtin(encodeSgtin96(gcp, itemRef, serial, filter = 0))
                 LocateTarget(
-                    epc = encodeSgtin96(gcp, itemRef, serial, filter = 0),
+                    epc = parsed.epc,
                     sgtin = normalized,
                     mask = LocateTarget.FILTER_IGNORING_MASK,
                     filterMasked = true

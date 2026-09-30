@@ -3,6 +3,7 @@ package de.ca.qcc.core.gs1
 import de.ca.qcc.domain.model.LocateTarget
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigInteger
@@ -32,9 +33,28 @@ class Gs1LocateTargetTest {
     }
 
     @Test
-    fun masks_haveExpectedShape() {
+    fun masks_haveExpectedBehavior() {
         assertEquals("F".repeat(24), LocateTarget.FULL_MASK)
-        assertEquals("FF1F" + "F".repeat(20), LocateTarget.FILTER_IGNORING_MASK)
+        val maskBig = BigInteger(LocateTarget.FILTER_IGNORING_MASK, 16)
+        fun enc(f: Int) = BigInteger(parser.encodeSgtin96("4065546", "092768", "12884901894", f), 16)
+        val base = enc(0).and(maskBig)
+        for (f in 0..7) assertEquals(base, enc(f).and(maskBig))
+        assertNotEquals(base, enc(0).flipBit(95 - 11).and(maskBig))
+        assertNotEquals(base, enc(0).flipBit(95 - 7).and(maskBig))
+    }
+
+    @Test
+    fun serialBoundaries_encode() {
+        val max = parser.encodeSgtin96("4065546", "092768", "274877906943", filter = 0)
+        assertEquals("4065546.092768.274877906943", parser.parseEpcToSgtin(max).sgtin)
+        val zero = parser.encodeSgtin96("4065546", "092768", "0", filter = 0)
+        assertEquals(24, zero.length)
+        assertEquals(BigInteger.ZERO, BigInteger(zero, 16).and(BigInteger.ONE.shiftLeft(38).subtract(BigInteger.ONE)))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun allZeroGtin_isRejected() {
+        parser.parseLocateTarget("0000000.000000.1")
     }
 
     @Test
