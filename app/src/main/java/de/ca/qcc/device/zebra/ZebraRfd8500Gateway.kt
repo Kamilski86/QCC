@@ -1,6 +1,13 @@
 package de.ca.qcc.device.zebra
 
 import android.content.Context
+import com.zebra.rfid.api3.ACCESS_OPERATION_CODE
+import com.zebra.rfid.api3.ACCESS_OPERATION_STATUS
+import com.zebra.rfid.api3.AccessFilter
+import com.zebra.rfid.api3.FILTER_MATCH_PATTERN
+import com.zebra.rfid.api3.MEMORY_BANK
+import com.zebra.rfid.api3.TagData
+import com.zebra.rfid.api3.TagPatternBase
 import com.zebra.rfid.api3.DYNAMIC_POWER_OPTIMIZATION
 import com.zebra.rfid.api3.ENUM_TRANSPORT
 import com.zebra.rfid.api3.ENUM_TRIGGER_MODE
@@ -24,6 +31,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import de.ca.qcc.domain.model.ReaderStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,11 +74,39 @@ class ZebraRfd8500Gateway @Inject constructor(
     // Prevents emitting more than one tag per inventory session; thread-safe
     private val inventoryActive = AtomicBoolean(false)
 
+    // ── Duplicate search state ──
+    @Volatile private var triggerMode = TriggerMode.QCC
+
+    private val handheldTriggerFlow = MutableSharedFlow<Boolean>(
+        replay = 0,
+        extraBufferCapacity = 4,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+
+    private val proximityFlow = MutableSharedFlow<Int>(
+        replay = 0,
+        extraBufferCapacity = 16,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+
+    private val locateActive = AtomicBoolean(false)
+
+    // Set while readEpcsNearby()/readTidsNearby() collect; receives every read TagData
+    @Volatile private var nearbySink: ((TagData) -> Unit)? = null
+
     override fun observeStatus(): Flow<ReaderStatus> = statusFlow.asStateFlow()
     override fun observeTagScans(): Flow<String> = tagFlow.asSharedFlow()
 
     // NEW: Method to observe trigger presses for unified control
     override fun observeTriggerEvents(): Flow<Unit> = triggerFlow.asSharedFlow()
+
+    override fun setTriggerMode(mode: TriggerMode) {
+        triggerMode = mode
+    }
+
+    override fun observeHandheldTrigger(): Flow<Boolean> = handheldTriggerFlow.asSharedFlow()
+
+    override fun observeProximity(): Flow<Int> = proximityFlow.asSharedFlow()
 
     // ── Event handler ────────────────────────────────────────────────────────
 
@@ -78,7 +114,19 @@ class ZebraRfd8500Gateway @Inject constructor(
 
         // Called on the SDK thread when a tag is decoded
         override fun eventReadNotify(e: RfidReadEvents) {
-            // Only handle the first tag; compareAndSet ensures exactly-once delivery
+            nearbySink?.let { sink ->
+                reader?.Actions?.getReadTags(100)?.forEach(sink)
+                return
+            }
+
+            if (locateActive.get()) {
+                reader?.Actions?.getReadTags(100)
+                    ?.filter { it.isContainsLocationInfo }
+                    ?.forEach { proximityFlow.tryEmit(it.LocationInfo.relativeDistance.toInt()) }
+                return
+            }
+
+            // QCC: only handle the first tag; compareAndSet ensures exactly-once delivery
             if (!inventoryActive.compareAndSet(true, false)) return
 
             // Stop immediately — we only want exactly 1 tag
@@ -95,13 +143,21 @@ class ZebraRfd8500Gateway @Inject constructor(
                 STATUS_EVENT_TYPE.HANDHELD_TRIGGER_EVENT -> {
                     when (e.StatusEventData.HandheldTriggerEventData.getHandheldEvent()) {
                         HANDHELD_TRIGGER_EVENT_TYPE.HANDHELD_TRIGGER_PRESSED -> {
-                            startInventoryInternal()
-                            triggerFlow.tryEmit(Unit) // Emit trigger press event
+                            if (triggerMode == TriggerMode.QCC) {
+                                startInventoryInternal()
+                                triggerFlow.tryEmit(Unit) // Emit trigger press event
+                            } else {
+                                handheldTriggerFlow.tryEmit(true)
+                            }
                         }
                         HANDHELD_TRIGGER_EVENT_TYPE.HANDHELD_TRIGGER_RELEASED -> {
-                            // If trigger released before a tag was read, stop inventory
-                            if (inventoryActive.compareAndSet(true, false)) {
-                                runCatching { reader?.Actions?.Inventory?.stop() }
+                            if (triggerMode == TriggerMode.QCC) {
+                                // If trigger released before a tag was read, stop inventory
+                                if (inventoryActive.compareAndSet(true, false)) {
+                                    runCatching { reader?.Actions?.Inventory?.stop() }
+                                }
+                            } else {
+                                handheldTriggerFlow.tryEmit(false)
                             }
                         }
                         else -> Unit
@@ -109,6 +165,9 @@ class ZebraRfd8500Gateway @Inject constructor(
                 }
                 STATUS_EVENT_TYPE.DISCONNECTION_EVENT -> {
                     inventoryActive.set(false)
+                    locateActive.set(false)
+                    nearbySink = null
+                    proximityFlow.tryEmit(0)
                     runCatching { reader?.Events?.removeEventsListener(eventHandler) }
                     reader = null
                     connectedReaderName = null
@@ -134,6 +193,105 @@ class ZebraRfd8500Gateway @Inject constructor(
         if (!currentReader.isConnected)
             throw IllegalStateException("Reader nicht verbunden")
         startInventoryInternal()
+    }
+
+    // ── Duplicate search ─────────────────────────────────────────────────────
+
+    override suspend fun startLocate(epc: String, mask: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val r = requireConnectedReader()
+                if (!locateActive.compareAndSet(false, true)) return@runCatching
+                try {
+                    r.Actions.TagLocationing.Perform(epc, mask, null)
+                } catch (t: Throwable) {
+                    locateActive.set(false)
+                    throw t
+                }
+            }.readableFailure()
+        }
+
+    override suspend fun stopLocate() {
+        withContext(Dispatchers.IO) {
+            if (locateActive.compareAndSet(true, false)) {
+                runCatching { reader?.Actions?.TagLocationing?.Stop() }
+                proximityFlow.tryEmit(0)
+            }
+        }
+    }
+
+    override suspend fun readEpcsNearby(): Result<List<String>> = readNearby(
+        start = { it.Actions.Inventory.perform() },
+        stop = { it.Actions.Inventory.stop() },
+        extract = { tag -> tag.tagID?.takeIf { it.isNotBlank() } }
+    )
+
+    override suspend fun readTidsNearby(epc: String, mask: String): Result<List<String>> = readNearby(
+        start = { r ->
+            val params = r.Actions.TagAccess.ReadAccessParams().apply {
+                memoryBank = MEMORY_BANK.MEMORY_BANK_TID
+                offset = 0
+                count = 0 // 0 = whole bank; TID length differs by chip vendor
+            }
+            r.Actions.TagAccess.readEvent(params, epcFilter(epc, mask), null)
+        },
+        stop = { it.Actions.TagAccess.stopAccess() },
+        extract = { tag ->
+            tag.memoryBankData?.takeIf {
+                tag.opCode == ACCESS_OPERATION_CODE.ACCESS_OPERATION_READ &&
+                    tag.opStatus == ACCESS_OPERATION_STATUS.ACCESS_SUCCESS &&
+                    it.isNotBlank()
+            }
+        }
+    )
+
+    // Reads at minimum power for a short window so only tags directly at the reader answer
+    private suspend fun readNearby(
+        start: (RFIDReader) -> Unit,
+        stop: (RFIDReader) -> Unit,
+        extract: (TagData) -> String?
+    ): Result<List<String>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val r = requireConnectedReader()
+            check(!locateActive.get() && !inventoryActive.get()) { "Reader busy" }
+            val found = LinkedHashSet<String>()
+            nearbySink = { tag -> extract(tag)?.let { synchronized(found) { found.add(it.uppercase()) } } }
+            try {
+                applyAntennaConfig(r, 0)
+                start(r)
+                delay(NEARBY_READ_WINDOW_MS)
+            } finally {
+                // In finally so a cancelled read never leaves the reader running
+                runCatching { stop(r) }
+                nearbySink = null
+                runCatching { applyAntennaConfig(r, currentPowerIndex) }
+            }
+            synchronized(found) { found.toList() }
+        }.readableFailure()
+    }
+
+    private fun epcFilter(epc: String, mask: String) = AccessFilter().apply {
+        TagPatternA = TagPatternBase().apply {
+            memoryBank = MEMORY_BANK.MEMORY_BANK_EPC
+            bitOffset = 32 // skip CRC + PC words
+            setTagPattern(epc)
+            tagPatternBitCount = 96
+            setTagMask(mask)
+            tagMaskBitCount = 96
+        }
+        accessFilterMatchPattern = FILTER_MATCH_PATTERN.A
+    }
+
+    private fun requireConnectedReader(): RFIDReader =
+        reader?.takeIf { it.isConnected } ?: throw IllegalStateException("Reader nicht verbunden")
+
+    private fun <T> Result<T>.readableFailure(): Result<T> {
+        val e = exceptionOrNull() as? OperationFailureException ?: return this
+        return Result.failure(IllegalStateException("result=${e.results}, vendor=${e.vendorMessage}"))
+    }
+
+    private companion object {
+        const val NEARBY_READ_WINDOW_MS = 700L
     }
 
     // ── Connection ───────────────────────────────────────────────────────────
@@ -195,11 +353,14 @@ class ZebraRfd8500Gateway @Inject constructor(
             try {
                 reader?.let {
                     runCatching { it.Actions.Inventory.stop() }
+                    if (locateActive.get()) runCatching { it.Actions.TagLocationing.Stop() }
                     eventHandler?.let { h -> runCatching { it.Events.removeEventsListener(h) } }
                     if (it.isConnected) runCatching { it.disconnect() }
                 }
             } finally {
                 inventoryActive.set(false)
+                locateActive.set(false)
+                nearbySink = null
                 reader = null
                 connectedReaderName = null
                 updateReaderStatus("Nicht verbunden")
