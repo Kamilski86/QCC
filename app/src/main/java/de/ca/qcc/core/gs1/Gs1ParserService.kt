@@ -1,5 +1,6 @@
 package de.ca.qcc.core.gs1
 
+import de.ca.qcc.domain.model.LocateTarget
 import de.ca.qcc.domain.model.QrScanResult
 import de.ca.qcc.domain.model.RfidScanResult
 import java.math.BigInteger
@@ -17,6 +18,7 @@ class Gs1ParserService {
     // Für eure Artikel aktuell fest angenommen:
     // Company Prefix = 7 Stellen
     private val qrCompanyPrefixDigits = 7
+    private val sgtinSerialBits = 38
 
     fun parseQr(raw: String): QrScanResult {
         val normalized = raw.trim()
@@ -129,6 +131,55 @@ class Gs1ParserService {
         val itemReference = "$indicator$itemReferenceWithoutIndicator"
 
         return "$companyPrefix.$itemReference.$normalizedSerial"
+    }
+
+    fun parseLocateTarget(input: String): LocateTarget {
+        val normalized = input.trim()
+        return when {
+            normalized.matches(Regex("^[0-9A-Fa-f]{24}$")) -> {
+                val parsed = parseEpcToSgtin(normalized)
+                LocateTarget(
+                    epc = parsed.epc,
+                    sgtin = parsed.sgtin,
+                    mask = LocateTarget.FULL_MASK,
+                    filterMasked = false
+                )
+            }
+            normalized.matches(Regex("""^\d+\.\d+\.\d+$""")) -> {
+                val (gcp, itemRef, serial) = normalized.split('.')
+                LocateTarget(
+                    epc = encodeSgtin96(gcp, itemRef, serial, filter = 0),
+                    sgtin = normalized,
+                    mask = LocateTarget.FILTER_IGNORING_MASK,
+                    filterMasked = true
+                )
+            }
+            else -> throw IllegalArgumentException("Eingabe ist weder EPC (24 Hex) noch SGTIN")
+        }
+    }
+
+    fun encodeSgtin96(gcp: String, itemRef: String, serial: String, filter: Int): String {
+        val partition = gcpDigits.indexOf(gcp.length)
+        require(partition >= 0) { "Company Prefix muss 6-12 Stellen haben" }
+        require(itemRef.length == itemRefDigits[partition]) {
+            "Item Reference muss ${itemRefDigits[partition]} Stellen haben"
+        }
+        require(filter in 0..7) { "Filterwert muss 0-7 sein" }
+        require(serial == "0" || !serial.startsWith("0")) {
+            "SGTIN-96 Seriennummer darf keine führende Null haben"
+        }
+        val serialValue = serial.toLong()
+        require(serialValue < (1L shl sgtinSerialBits)) { "Seriennummer zu groß für SGTIN-96" }
+
+        val bits = buildString {
+            append(sgtin96Header)
+            append(filter.toString(2).padStart(3, '0'))
+            append(partition.toString(2).padStart(3, '0'))
+            append(gcp.toLong().toString(2).padStart(gcpBits[partition], '0'))
+            append(itemRef.toLong().toString(2).padStart(itemRefBits[partition], '0'))
+            append(serialValue.toString(2).padStart(sgtinSerialBits, '0'))
+        }
+        return BigInteger(bits, 2).toString(16).padStart(24, '0').uppercase()
     }
 
     private fun hexToBinary(hex: String): String {

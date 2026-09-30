@@ -49,3 +49,18 @@ data class MismatchRecord(
     val gtinTag: String,
     val gtinQr: String
 )
+
+@Serializable
+data class LocateTarget(
+    val epc: String,
+    val sgtin: String,
+    val mask: String,
+    val filterMasked: Boolean
+) {
+    companion object {
+        val FULL_MASK: String = "F".repeat(24)
+
+        // Ignores the 3 filter bits (bits 8-10) of an SGTIN-96 EPC
+        val FILTER_IGNORING_MASK: String = "FF1F" + "F".repeat(20)
+    }
+}
