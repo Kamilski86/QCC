@@ -1,10 +1,8 @@
 package de.ca.qcc.feature.duplicates
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
@@ -14,6 +12,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,17 +41,26 @@ fun ProximityGauge(proximity: Int, active: Boolean, modifier: Modifier = Modifie
     // Arc "breathes" in the beep rhythm
     val periodMs = (beepIntervalMs(proximity) ?: 1000L).toInt().coerceAtLeast(160)
     val breathing = active && proximity > 0
-    val alpha by rememberInfiniteTransition(label = "breath").animateFloat(
-        initialValue = 1f,
-        targetValue = if (breathing) 0.55f else 1f,
-        animationSpec = infiniteRepeatable(tween(periodMs / 2), RepeatMode.Reverse),
-        label = "alpha"
-    )
+    // Read the latest period without restarting the loop on every proximity update
+    val period by rememberUpdatedState(periodMs)
+    val alpha = remember { Animatable(1f) }
+    LaunchedEffect(breathing) {
+        if (!breathing) {
+            alpha.snapTo(1f)
+            return@LaunchedEffect
+        }
+        while (true) {
+            alpha.animateTo(0.55f, tween(period / 2, easing = LinearEasing))
+            alpha.animateTo(1f, tween(period / 2, easing = LinearEasing))
+        }
+    }
 
     Box(modifier.fillMaxWidth().aspectRatio(2f), contentAlignment = Alignment.BottomCenter) {
         Canvas(Modifier.fillMaxSize()) {
             val stroke = 16.dp.toPx()
-            val diameter = min(size.width, size.height * 2) - stroke
+            // Keep the round caps inside the canvas: width loses a full stroke; vertically the
+            // arc needs a half stroke above the top and a half stroke below its baseline
+            val diameter = min(size.width - stroke, 2 * (size.height - stroke))
             val topLeft = Offset((size.width - diameter) / 2, stroke / 2)
             val arcSize = Size(diameter, diameter)
             drawArc(
@@ -70,7 +80,7 @@ fun ProximityGauge(proximity: Int, active: Boolean, modifier: Modifier = Modifie
                     useCenter = false,
                     topLeft = topLeft,
                     size = arcSize,
-                    alpha = alpha,
+                    alpha = alpha.value,
                     style = Stroke(stroke, cap = StrokeCap.Round)
                 )
             }

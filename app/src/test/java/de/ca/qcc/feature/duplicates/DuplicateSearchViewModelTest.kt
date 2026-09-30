@@ -327,6 +327,19 @@ class DuplicateSearchViewModelTest {
     }
 
     @Test
+    fun triggerAfterScreenStopped_doesNotStartLocating() = runTest {
+        val vm = createViewModel()
+        vm.startSearchFor(sgtin)
+        vm.onScreenStopped()
+        val callsBefore = reader.locateCalls.size
+
+        reader.trigger.emit(true)
+
+        assertEquals(callsBefore, reader.locateCalls.size)
+        assertFalse(vm.uiState.value.locating)
+    }
+
+    @Test
     fun screenStopped_stopsLocating_andRestoresQccMode() {
         val vm = createViewModel()
         vm.startSearchFor(epc)

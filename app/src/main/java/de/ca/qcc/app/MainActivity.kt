@@ -1,9 +1,11 @@
 package de.ca.qcc.app
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -172,7 +175,11 @@ private fun AppNav() {
                         icon = Icons.Default.Search,
                         selected = currentRoute == Screen.Duplicates.route,
                         onClick = {
-                            navController.navigate(Screen.Duplicates.route)
+                            // Never stack a second Duplicates entry (and view model)
+                            navController.navigate(Screen.Duplicates.route) {
+                                launchSingleTop = true
+                                popUpTo(Screen.Dashboard.route)
+                            }
                             scope.launch { drawerState.close() }
                         }
                     )
@@ -267,6 +274,23 @@ private fun AppNav() {
                     onDispose {
                         lifecycleOwner.lifecycle.removeObserver(observer)
                         duplicateViewModel.onScreenStopped()
+                    }
+                }
+
+                // The app hides the keyboard globally (ADJUST_NOTHING). This screen has text
+                // fields, so let the window resize here so focused fields stay visible;
+                // restore the activity's mode when leaving.
+                val window = (LocalContext.current as? Activity)?.window
+                DisposableEffect(window) {
+                    window?.setSoftInputMode(
+                        WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE or
+                            WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED
+                    )
+                    onDispose {
+                        window?.setSoftInputMode(
+                            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING or
+                                WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+                        )
                     }
                 }
 

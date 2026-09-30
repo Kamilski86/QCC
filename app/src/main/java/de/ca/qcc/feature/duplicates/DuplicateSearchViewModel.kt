@@ -280,6 +280,7 @@ class DuplicateSearchViewModel @Inject constructor(
         }
 
     private fun onTrigger(pressed: Boolean) {
+        if (!screenActive) return
         val state = _uiState.value
         when (state.phase) {
             DuplicatePhase.TARGET -> if (pressed) captureFromReader()
@@ -290,6 +291,7 @@ class DuplicateSearchViewModel @Inject constructor(
     }
 
     private fun onProximity(value: Int) {
+        if (!screenActive) return
         if (!_uiState.value.locating) return
         val proximity = value.coerceIn(0, 100)
         _uiState.update { it.copy(proximity = proximity) }

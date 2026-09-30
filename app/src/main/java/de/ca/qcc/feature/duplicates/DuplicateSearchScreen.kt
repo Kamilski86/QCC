@@ -91,10 +91,10 @@ fun DuplicateSearchScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            state.message?.let { message -> item { MessageCard(message) } }
+            state.message?.let { message -> item(key = "message") { MessageCard(message) } }
 
             if (state.phase == DuplicatePhase.TARGET) {
-                item {
+                item(key = "input") {
                     WhiteCard {
                         OutlinedTextField(
                             value = state.input,
@@ -135,14 +135,14 @@ fun DuplicateSearchScreen(
                     }
                 }
                 state.target?.let { target ->
-                    item {
+                    item(key = "target") {
                         WhiteCard {
                             LabeledValue(stringResource(R.string.dup_target_sgtin), target.sgtin)
                             LabeledValue(stringResource(R.string.dup_epc), target.epc, monospace = true)
                         }
                     }
                 }
-                item {
+                item(key = "store") {
                     WhiteCard {
                         OutlinedTextField(
                             value = state.store,
@@ -153,7 +153,7 @@ fun DuplicateSearchScreen(
                         )
                     }
                 }
-                item {
+                item(key = "start") {
                     Button(
                         onClick = onStartSearch,
                         enabled = state.target != null && state.readerConnected && !state.busy,
@@ -164,7 +164,7 @@ fun DuplicateSearchScreen(
             } else {
                 val target = state.target
                 if (target != null) {
-                    item {
+                    item(key = "targetInfo") {
                         WhiteCard {
                             LabeledValue(stringResource(R.string.dup_target_sgtin), target.sgtin)
                             LabeledValue(stringResource(R.string.dup_epc), target.epc, monospace = true)
@@ -174,7 +174,7 @@ fun DuplicateSearchScreen(
                         }
                     }
                 }
-                item {
+                item(key = "gauge") {
                     WhiteCard {
                         ProximityGauge(proximity = state.proximity, active = state.locating)
                         Text(
@@ -187,7 +187,7 @@ fun DuplicateSearchScreen(
                         )
                     }
                 }
-                item {
+                item(key = "continuous") {
                     WhiteCard {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -220,7 +220,7 @@ fun DuplicateSearchScreen(
                         }
                     }
                 }
-                item {
+                item(key = "counters") {
                     WhiteCard {
                         Row(modifier = Modifier.fillMaxWidth()) {
                             Column(Modifier.weight(1f)) {
@@ -236,7 +236,7 @@ fun DuplicateSearchScreen(
                         }
                     }
                 }
-                item {
+                item(key = "confirm") {
                     Button(
                         onClick = onConfirmFind,
                         enabled = !state.busy,
@@ -244,7 +244,7 @@ fun DuplicateSearchScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) { Text(stringResource(R.string.dup_confirm_find)) }
                 }
-                item {
+                item(key = "end") {
                     Button(
                         onClick = onEndSearch,
                         enabled = !state.busy,
