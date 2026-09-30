@@ -29,3 +29,30 @@ interface ScanDao {
     @Query("SELECT * FROM scans ORDER BY timestamp DESC")
     suspend fun getAllForExport(): List<ScanEntity>
 }
+
+@Dao
+interface DuplicateDao {
+    @Insert
+    suspend fun insertSearch(search: DuplicateSearchEntity): Long
+
+    @Query("SELECT * FROM duplicate_searches WHERE endedAt IS NULL ORDER BY startedAt DESC LIMIT 1")
+    suspend fun getOpenSearch(): DuplicateSearchEntity?
+
+    @Query("SELECT * FROM duplicate_searches WHERE id = :id")
+    suspend fun getSearch(id: Long): DuplicateSearchEntity?
+
+    @Query("UPDATE duplicate_searches SET endedAt = :endedAt, exportFileName = :fileName WHERE id = :id")
+    suspend fun finishSearch(id: Long, endedAt: Long, fileName: String?)
+
+    @Insert
+    suspend fun insertFind(find: DuplicateFindEntity): Long
+
+    @Query("SELECT * FROM duplicate_finds WHERE tid = :tid LIMIT 1")
+    suspend fun findByTid(tid: String): DuplicateFindEntity?
+
+    @Query("SELECT * FROM duplicate_finds WHERE searchId = :searchId ORDER BY findNo")
+    suspend fun getFinds(searchId: Long): List<DuplicateFindEntity>
+
+    @Query("SELECT COUNT(*) FROM duplicate_finds WHERE searchId = :searchId")
+    suspend fun countFinds(searchId: Long): Int
+}

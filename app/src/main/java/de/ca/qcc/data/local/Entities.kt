@@ -1,6 +1,8 @@
 package de.ca.qcc.data.local
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "mismatches")
@@ -23,4 +25,35 @@ data class ScanEntity(
     val sgtinQr: String = "",
     val sgtinTag: String = "",
     val qrRaw: String = ""
+)
+
+@Entity(tableName = "duplicate_searches")
+data class DuplicateSearchEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val startedAt: Long,
+    val endedAt: Long? = null,
+    val sgtin: String,
+    val epc: String,
+    val store: String? = null,
+    val exportFileName: String? = null
+)
+
+@Entity(
+    tableName = "duplicate_finds",
+    foreignKeys = [
+        ForeignKey(
+            entity = DuplicateSearchEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["searchId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index(value = ["tid"], unique = true), Index(value = ["searchId"])]
+)
+data class DuplicateFindEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val searchId: Long,
+    val foundAt: Long,
+    val tid: String,
+    val findNo: Int
 )

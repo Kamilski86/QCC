@@ -58,3 +58,31 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         db.execSQL("ALTER TABLE mismatches_new RENAME TO mismatches")
     }
 }
+// Adds the duplicate finder tables; existing tables are untouched.
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS `duplicate_searches` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `startedAt` INTEGER NOT NULL,
+                `endedAt` INTEGER,
+                `sgtin` TEXT NOT NULL,
+                `epc` TEXT NOT NULL,
+                `store` TEXT,
+                `exportFileName` TEXT
+            )"""
+        )
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS `duplicate_finds` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `searchId` INTEGER NOT NULL,
+                `foundAt` INTEGER NOT NULL,
+                `tid` TEXT NOT NULL,
+                `findNo` INTEGER NOT NULL,
+                FOREIGN KEY(`searchId`) REFERENCES `duplicate_searches`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+            )"""
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_duplicate_finds_tid` ON `duplicate_finds` (`tid`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_duplicate_finds_searchId` ON `duplicate_finds` (`searchId`)")
+    }
+}

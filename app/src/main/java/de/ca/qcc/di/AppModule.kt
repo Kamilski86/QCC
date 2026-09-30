@@ -14,6 +14,7 @@ import de.ca.qcc.data.local.MIGRATION_2_3
 import de.ca.qcc.data.local.MIGRATION_3_4
 import de.ca.qcc.data.local.MIGRATION_4_5
 import de.ca.qcc.data.local.MIGRATION_5_6
+import de.ca.qcc.data.local.MIGRATION_6_7
 import de.ca.qcc.data.repository.MismatchRepository
 import de.ca.qcc.device.honeywell.BarcodeScannerGateway
 import de.ca.qcc.device.honeywell.HoneywellCt37ScannerGateway
@@ -29,7 +30,7 @@ object AppModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "qcc.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .build()
 
     @Provides

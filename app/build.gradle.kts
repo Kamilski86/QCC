@@ -36,6 +36,10 @@ android {
         unitTests.isIncludeAndroidResources = true
     }
 
+    sourceSets {
+        getByName("debug").assets.srcDir("$projectDir/schemas")
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -93,6 +97,7 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("androidx.test:core-ktx:1.6.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("androidx.room:room-testing:2.6.1")
 
     // Local AAR files
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
