@@ -53,14 +53,12 @@ data class MismatchRecord(
 @Serializable
 data class LocateTarget(
     val epc: String,
-    val sgtin: String,
-    val mask: String,
-    val filterMasked: Boolean
+    val sgtin: String
 ) {
     companion object {
         val FULL_MASK: String = "F".repeat(24)
 
-        // Ignores the 3 filter bits (bits 8-10) of an SGTIN-96 EPC
-        val FILTER_IGNORING_MASK: String = "FF1F" + "F".repeat(20)
+        // GS1 filter value "point of sale trade item"
+        const val DEFAULT_SGTIN_FILTER = 1
     }
 }

@@ -2,9 +2,6 @@ package de.ca.qcc.core.gs1
 
 import de.ca.qcc.domain.model.LocateTarget
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigInteger
 
@@ -13,34 +10,55 @@ class Gs1LocateTargetTest {
     private val parser = Gs1ParserService()
 
     @Test
-    fun epcInput_isNormalized_andSearchedExactly() {
+    fun epcInput_isNormalized() {
         val target = parser.parseLocateTarget(" 3014f824285a980300000006 ")
 
         assertEquals("3014F824285A980300000006", target.epc)
         assertEquals("4065546.092768.12884901894", target.sgtin)
-        assertEquals(LocateTarget.FULL_MASK, target.mask)
-        assertFalse(target.filterMasked)
     }
 
     @Test
-    fun sgtinInput_encodesEpcWithFilterZero_andIgnoresFilterBits() {
+    fun fullMask_isAllOnes() {
+        assertEquals("F".repeat(24), LocateTarget.FULL_MASK)
+    }
+
+    @Test
+    fun sgtinInput_usesDefaultFilterOne() {
         val target = parser.parseLocateTarget("4065546.092768.12884901894")
+
+        assertEquals(1, LocateTarget.DEFAULT_SGTIN_FILTER)
+        assertEquals("3034F824285A980300000006", target.epc)
+        assertEquals("4065546.092768.12884901894", target.sgtin)
+    }
+
+    @Test
+    fun sgtinInput_withFilterZero_encodesFilterZero() {
+        val target = parser.parseLocateTarget("4065546.092768.12884901894", sgtinFilter = 0)
 
         assertEquals("3014F824285A980300000006", target.epc)
         assertEquals("4065546.092768.12884901894", target.sgtin)
-        assertEquals(LocateTarget.FILTER_IGNORING_MASK, target.mask)
-        assertTrue(target.filterMasked)
     }
 
     @Test
-    fun masks_haveExpectedBehavior() {
-        assertEquals("F".repeat(24), LocateTarget.FULL_MASK)
-        val maskBig = BigInteger(LocateTarget.FILTER_IGNORING_MASK, 16)
-        fun enc(f: Int) = BigInteger(parser.encodeSgtin96("4065546", "092768", "12884901894", f), 16)
-        val base = enc(0).and(maskBig)
-        for (f in 0..7) assertEquals(base, enc(f).and(maskBig))
-        assertNotEquals(base, enc(0).flipBit(95 - 11).and(maskBig))
-        assertNotEquals(base, enc(0).flipBit(95 - 7).and(maskBig))
+    fun fieldDuplicate_roundTripsThroughSgtinWithDefaultFilter() {
+        val fromEpc = parser.parseLocateTarget("3034F8242800C10300000011")
+        val fromSgtin = parser.parseLocateTarget(fromEpc.sgtin)
+
+        assertEquals("3034F8242800C10300000011", fromEpc.epc)
+        assertEquals(fromEpc.epc, fromSgtin.epc)
+        assertEquals(fromEpc.sgtin, fromSgtin.sgtin)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun sgtinInput_withFilterOutOfRange_isRejected() {
+        parser.parseLocateTarget("4065546.092768.12884901894", sgtinFilter = 8)
+    }
+
+    @Test
+    fun epcInput_ignoresSgtinFilter() {
+        val target = parser.parseLocateTarget("3014F824285A980300000006", sgtinFilter = 5)
+
+        assertEquals("3014F824285A980300000006", target.epc)
     }
 
     @Test

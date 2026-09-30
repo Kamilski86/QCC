@@ -133,27 +133,21 @@ class Gs1ParserService {
         return "$companyPrefix.$itemReference.$normalizedSerial"
     }
 
-    fun parseLocateTarget(input: String): LocateTarget {
+    fun parseLocateTarget(
+        input: String,
+        sgtinFilter: Int = LocateTarget.DEFAULT_SGTIN_FILTER
+    ): LocateTarget {
         val normalized = input.trim()
         return when {
             normalized.matches(Regex("^[0-9A-Fa-f]{24}$")) -> {
+                // The EPC carries its own filter value; sgtinFilter does not apply
                 val parsed = parseEpcToSgtin(normalized)
-                LocateTarget(
-                    epc = parsed.epc,
-                    sgtin = parsed.sgtin,
-                    mask = LocateTarget.FULL_MASK,
-                    filterMasked = false
-                )
+                LocateTarget(epc = parsed.epc, sgtin = parsed.sgtin)
             }
             normalized.matches(Regex("""^\d+\.\d+\.\d+$""")) -> {
                 val (gcp, itemRef, serial) = normalized.split('.')
-                val parsed = parseEpcToSgtin(encodeSgtin96(gcp, itemRef, serial, filter = 0))
-                LocateTarget(
-                    epc = parsed.epc,
-                    sgtin = normalized,
-                    mask = LocateTarget.FILTER_IGNORING_MASK,
-                    filterMasked = true
-                )
+                val parsed = parseEpcToSgtin(encodeSgtin96(gcp, itemRef, serial, sgtinFilter))
+                LocateTarget(epc = parsed.epc, sgtin = normalized)
             }
             else -> throw IllegalArgumentException("Eingabe ist weder EPC (24 Hex) noch SGTIN")
         }
