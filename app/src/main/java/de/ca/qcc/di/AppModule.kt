@@ -8,6 +8,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import de.ca.qcc.data.export.CsvDocumentWriter
+import de.ca.qcc.data.export.MediaStoreCsvDocumentWriter
 import de.ca.qcc.data.local.AppDatabase
 import de.ca.qcc.data.local.MIGRATION_1_2
 import de.ca.qcc.data.local.MIGRATION_2_3
@@ -37,6 +39,10 @@ object AppModule {
     @Singleton
     fun provideMismatchRepository(db: AppDatabase): MismatchRepository =
         MismatchRepository(db)
+
+    @Provides
+    fun provideCsvDocumentWriter(@ApplicationContext context: Context): CsvDocumentWriter =
+        MediaStoreCsvDocumentWriter(context)
 }
 
 @Module

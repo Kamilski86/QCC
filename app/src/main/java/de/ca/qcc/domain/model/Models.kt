@@ -62,3 +62,15 @@ data class LocateTarget(
         const val DEFAULT_SGTIN_FILTER = 1
     }
 }
+
+data class DuplicateSearch(
+    val id: Long,
+    val target: LocateTarget,
+    val store: String?,
+    val foundCount: Int
+)
+
+sealed interface RegisterFindResult {
+    data class Saved(val findNo: Int) : RegisterFindResult
+    data class AlreadyFound(val findNo: Int) : RegisterFindResult
+}

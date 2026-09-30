@@ -1,10 +1,8 @@
 package de.ca.qcc.data.repository
 
-import android.content.ContentValues
 import android.content.Context
-import android.os.Build
-import android.os.Environment
-import android.provider.MediaStore
+import de.ca.qcc.data.export.MediaStoreCsvDocumentWriter
+import de.ca.qcc.data.export.csvEscape
 import de.ca.qcc.data.local.AppDatabase
 import de.ca.qcc.data.local.MismatchEntity
 import de.ca.qcc.data.local.ScanEntity
@@ -44,11 +42,6 @@ class MismatchRepository @Inject constructor(private val db: AppDatabase) {
         ))
     }
 
-    private fun String.csvEscape(): String {
-        val needsQuoting = contains(',') || contains('"') || contains('\n') || contains('\r')
-        return if (needsQuoting) "\"${replace("\"", "\"\"")}\"" else this
-    }
-
     suspend fun exportPendingCsv(context: Context): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             val items = db.scanDao().getAllForExport()
@@ -67,24 +60,7 @@ class MismatchRepository @Inject constructor(private val db: AppDatabase) {
                 }
             }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                    put(MediaStore.MediaColumns.MIME_TYPE, "text/csv")
-                    put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOCUMENTS)
-                }
-                val uri = context.contentResolver.insert(
-                    MediaStore.Files.getContentUri("external"),
-                    contentValues
-                ) ?: throw IllegalStateException("MediaStore insert failed")
-
-                context.contentResolver.openOutputStream(uri)?.use { it.write(csvContent.toByteArray()) }
-                    ?: throw IllegalStateException("Could not open output stream")
-            } else {
-                val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-                    .also { if (!it.exists()) it.mkdirs() }
-                java.io.File(dir, fileName).writeText(csvContent)
-            }
+            MediaStoreCsvDocumentWriter(context).write(fileName, csvContent)
 
             fileName
         }
