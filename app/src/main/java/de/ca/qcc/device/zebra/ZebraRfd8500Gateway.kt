@@ -29,7 +29,10 @@ import com.zebra.rfid.api3.STOP_TRIGGER_TYPE
 import com.zebra.rfid.api3.TriggerInfo
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.ca.qcc.domain.model.ReaderStatus
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -102,8 +105,15 @@ class ZebraRfd8500Gateway @Inject constructor(
     // NEW: Method to observe trigger presses for unified control
     override fun observeTriggerEvents(): Flow<Unit> = triggerFlow.asSharedFlow()
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override fun setTriggerMode(mode: TriggerMode) {
         triggerMode = mode
+        // Never leave locate running in QCC mode: eventReadNotify routes reads into the
+        // locate branch while locateActive, which would swallow QCC tag reads
+        if (mode == TriggerMode.QCC && locateActive.get()) {
+            scope.launch { stopLocate() }
+        }
     }
 
     override fun observeHandheldTrigger(): Flow<Boolean> = handheldTriggerFlow.asSharedFlow()
