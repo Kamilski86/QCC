@@ -1,0 +1,291 @@
+package de.ca.qcc.feature.duplicates
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import de.ca.qcc.core.gs1.Gs1ParserService
+import de.ca.qcc.data.local.StorePreferences
+import de.ca.qcc.data.repository.DuplicateSearchRepository
+import de.ca.qcc.device.zebra.RfidReaderGateway
+import de.ca.qcc.device.zebra.TriggerMode
+import de.ca.qcc.domain.model.LocateTarget
+import de.ca.qcc.domain.model.RegisterFindResult
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+enum class DuplicatePhase { TARGET, SEARCH }
+
+// Typed so the UI can localize; the ViewModel never builds user-visible text
+sealed interface DuplicateMessage {
+    data class Saved(val findNo: Int) : DuplicateMessage
+    data class AlreadyFound(val findNo: Int) : DuplicateMessage
+    data object NoTagAtReader : DuplicateMessage
+    data object MultipleTags : DuplicateMessage
+    data object CaptureNoTag : DuplicateMessage
+    data object CaptureMultipleTags : DuplicateMessage
+    data object InvalidTarget : DuplicateMessage
+    data object ReaderNotConnected : DuplicateMessage
+    data class ReaderError(val detail: String) : DuplicateMessage
+    data class Exported(val fileName: String) : DuplicateMessage
+    data object NothingExported : DuplicateMessage
+    data class ExportFailed(val detail: String) : DuplicateMessage
+}
+
+data class DuplicateUiState(
+    val phase: DuplicatePhase = DuplicatePhase.TARGET,
+    val input: String = "",
+    val sgtinFilter: Int = LocateTarget.DEFAULT_SGTIN_FILTER,
+    val target: LocateTarget? = null,
+    val store: String = "",
+    val searchId: Long? = null,
+    val foundCount: Int = 0,
+    val lastTid: String? = null,
+    val proximity: Int = 0,
+    val locating: Boolean = false,
+    val continuous: Boolean = false,
+    val busy: Boolean = false,
+    val readerConnected: Boolean = false,
+    val message: DuplicateMessage? = null
+)
+
+@HiltViewModel
+class DuplicateSearchViewModel @Inject constructor(
+    private val rfid: RfidReaderGateway,
+    private val repository: DuplicateSearchRepository,
+    private val storePreferences: StorePreferences,
+    private val feedback: ProximityFeedback
+) : ViewModel() {
+
+    private val parser = Gs1ParserService()
+
+    private val _uiState = MutableStateFlow(DuplicateUiState(store = storePreferences.lastStore))
+    val uiState: StateFlow<DuplicateUiState> = _uiState.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            rfid.observeStatus().collect { status ->
+                _uiState.update { it.copy(readerConnected = status.isConnected) }
+                // Connection lost mid-search: stop locating; finds are already persisted
+                if (!status.isConnected && _uiState.value.locating) {
+                    _uiState.update { it.copy(continuous = false, message = DuplicateMessage.ReaderNotConnected) }
+                    stopLocating()
+                }
+            }
+        }
+        viewModelScope.launch { rfid.observeProximity().collect(::onProximity) }
+        viewModelScope.launch { rfid.observeHandheldTrigger().collect(::onTrigger) }
+        viewModelScope.launch {
+            repository.getOpenSearch()?.let { open ->
+                _uiState.update {
+                    it.copy(
+                        phase = DuplicatePhase.SEARCH,
+                        input = open.target.epc,
+                        target = open.target,
+                        store = open.store.orEmpty(),
+                        searchId = open.id,
+                        foundCount = open.foundCount
+                    )
+                }
+            }
+            applyTriggerMode()
+        }
+    }
+
+    // ── Screen lifecycle ──
+
+    fun onScreenStarted() = applyTriggerMode()
+
+    fun onScreenStopped() {
+        _uiState.update { it.copy(continuous = false) }
+        viewModelScope.launch { stopLocating() }
+        rfid.setTriggerMode(TriggerMode.QCC)
+    }
+
+    override fun onCleared() {
+        feedback.release()
+        rfid.setTriggerMode(TriggerMode.QCC)
+    }
+
+    // ── Phase 1: target ──
+
+    fun onInputChange(text: String) =
+        _uiState.update { it.copy(input = text, target = null, message = null) }
+
+    // Only affects typed SGTINs; a hex EPC carries its own filter value
+    fun onSgtinFilterChange(filter: Int) =
+        _uiState.update { it.copy(sgtinFilter = filter, target = null, message = null) }
+
+    fun onStoreChange(text: String) = _uiState.update { it.copy(store = text) }
+
+    fun applyInput() {
+        val state = _uiState.value
+        runCatching { parser.parseLocateTarget(state.input, state.sgtinFilter) }
+            .onSuccess { target -> _uiState.update { it.copy(target = target, message = null) } }
+            .onFailure { _uiState.update { it.copy(target = null, message = DuplicateMessage.InvalidTarget) } }
+    }
+
+    fun captureFromReader() {
+        val state = _uiState.value
+        if (state.busy) return
+        if (!state.readerConnected) {
+            _uiState.update { it.copy(message = DuplicateMessage.ReaderNotConnected) }
+            return
+        }
+        _uiState.update { it.copy(busy = true, message = null) }
+        viewModelScope.launch {
+            rfid.readEpcsNearby()
+                .onSuccess { epcs ->
+                    when (epcs.size) {
+                        0 -> _uiState.update { it.copy(message = DuplicateMessage.CaptureNoTag) }
+                        1 -> {
+                            _uiState.update { it.copy(input = epcs.single()) }
+                            applyInput()
+                        }
+                        else -> _uiState.update { it.copy(message = DuplicateMessage.CaptureMultipleTags) }
+                    }
+                }
+                .onFailure { e -> _uiState.update { it.copy(message = e.toReaderError()) } }
+            _uiState.update { it.copy(busy = false) }
+        }
+    }
+
+    fun startSearch() {
+        val state = _uiState.value
+        val target = state.target ?: return
+        if (!state.readerConnected) {
+            _uiState.update { it.copy(message = DuplicateMessage.ReaderNotConnected) }
+            return
+        }
+        viewModelScope.launch {
+            val store = state.store.trim()
+            storePreferences.lastStore = store
+            val searchId = repository.startSearch(target, store.ifBlank { null })
+            _uiState.update {
+                it.copy(
+                    phase = DuplicatePhase.SEARCH,
+                    store = store,
+                    searchId = searchId,
+                    foundCount = 0,
+                    lastTid = null,
+                    message = null
+                )
+            }
+            applyTriggerMode()
+        }
+    }
+
+    // ── Phase 2: search ──
+
+    fun setContinuous(enabled: Boolean) {
+        _uiState.update { it.copy(continuous = enabled) }
+        viewModelScope.launch { if (enabled) startLocating() else stopLocating() }
+    }
+
+    fun confirmFind() {
+        val state = _uiState.value
+        val target = state.target ?: return
+        val searchId = state.searchId ?: return
+        if (state.busy) return
+        _uiState.update { it.copy(busy = true, message = null) }
+        viewModelScope.launch {
+            stopLocating()
+            val message = rfid.readTidsNearby(target.epc, LocateTarget.FULL_MASK).fold(
+                onSuccess = { tids ->
+                    when (tids.size) {
+                        0 -> DuplicateMessage.NoTagAtReader
+                        1 -> registerFind(searchId, tids.single())
+                        else -> DuplicateMessage.MultipleTags
+                    }
+                },
+                onFailure = { it.toReaderError() }
+            )
+            _uiState.update { it.copy(busy = false, message = message) }
+            if (_uiState.value.continuous) startLocating()
+        }
+    }
+
+    fun endSearch() {
+        val state = _uiState.value
+        val searchId = state.searchId ?: return
+        if (state.busy) return
+        _uiState.update { it.copy(busy = true, continuous = false) }
+        viewModelScope.launch {
+            stopLocating()
+            runCatching { repository.finishSearch(searchId) }
+                .onSuccess { fileName ->
+                    val current = _uiState.value
+                    _uiState.value = DuplicateUiState(
+                        sgtinFilter = current.sgtinFilter,
+                        store = current.store,
+                        readerConnected = current.readerConnected,
+                        message = fileName?.let { DuplicateMessage.Exported(it) }
+                            ?: DuplicateMessage.NothingExported
+                    )
+                    applyTriggerMode()
+                }
+                .onFailure { e ->
+                    _uiState.update {
+                        it.copy(busy = false, message = DuplicateMessage.ExportFailed(e.message ?: e.javaClass.simpleName))
+                    }
+                }
+        }
+    }
+
+    // ── Internals ──
+
+    private suspend fun registerFind(searchId: Long, tid: String): DuplicateMessage =
+        when (val result = repository.registerFind(searchId, tid)) {
+            is RegisterFindResult.Saved -> {
+                _uiState.update { it.copy(foundCount = result.findNo, lastTid = tid.uppercase()) }
+                DuplicateMessage.Saved(result.findNo)
+            }
+            is RegisterFindResult.AlreadyFound -> DuplicateMessage.AlreadyFound(result.findNo)
+        }
+
+    private fun onTrigger(pressed: Boolean) {
+        val state = _uiState.value
+        when (state.phase) {
+            DuplicatePhase.TARGET -> if (pressed) captureFromReader()
+            DuplicatePhase.SEARCH -> if (!state.continuous && !state.busy) {
+                viewModelScope.launch { if (pressed) startLocating() else stopLocating() }
+            }
+        }
+    }
+
+    private fun onProximity(value: Int) {
+        if (!_uiState.value.locating) return
+        val proximity = value.coerceIn(0, 100)
+        _uiState.update { it.copy(proximity = proximity) }
+        feedback.update(proximity)
+    }
+
+    private suspend fun startLocating() {
+        val state = _uiState.value
+        val target = state.target ?: return
+        if (state.locating || state.phase != DuplicatePhase.SEARCH) return
+        _uiState.update { it.copy(locating = true) }
+        rfid.startLocate(target.epc, LocateTarget.FULL_MASK).onFailure { e ->
+            _uiState.update { it.copy(locating = false, continuous = false, message = e.toReaderError()) }
+        }
+    }
+
+    private suspend fun stopLocating() {
+        if (!_uiState.value.locating) return
+        _uiState.update { it.copy(locating = false, proximity = 0) }
+        feedback.stop()
+        rfid.stopLocate()
+    }
+
+    private fun applyTriggerMode() {
+        rfid.setTriggerMode(
+            if (_uiState.value.phase == DuplicatePhase.SEARCH) TriggerMode.LOCATE else TriggerMode.CAPTURE
+        )
+    }
+
+    private fun Throwable.toReaderError() =
+        DuplicateMessage.ReaderError(message ?: javaClass.simpleName)
+}
