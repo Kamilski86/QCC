@@ -234,7 +234,7 @@ class ZebraRfd8500Gateway @Inject constructor(
             val params = r.Actions.TagAccess.ReadAccessParams().apply {
                 memoryBank = MEMORY_BANK.MEMORY_BANK_TID
                 offset = 0
-                count = 0 // 0 = whole bank; TID length differs by chip vendor
+                count = 6 // 96-bit TID; count = 0 padded the result with zeros on the RFD8500
             }
             r.Actions.TagAccess.readEvent(params, epcFilter(epc, mask), null)
         },
@@ -264,7 +264,7 @@ class ZebraRfd8500Gateway @Inject constructor(
                 var powerRestoreError: Throwable? = null
                 nearbySink = { tag -> extract(tag)?.let { synchronized(found) { found.add(it.uppercase()) } } }
                 try {
-                    applyAntennaConfig(r, 0)
+                    applyAntennaConfig(r, nearbyPowerIndex())
                     start(r)
                     delay(NEARBY_READ_WINDOW_MS)
                     check(reader === r && r.isConnected) { "Reader nicht verbunden" }
@@ -319,8 +319,13 @@ class ZebraRfd8500Gateway @Inject constructor(
         return Result.failure(IllegalStateException("result=${e.results}, vendor=${e.vendorMessage}"))
     }
 
+    private fun nearbyPowerIndex() = maxPowerIndex * NEARBY_POWER_PERCENT / 100
+
     private companion object {
         const val NEARBY_READ_WINDOW_MS = 700L
+
+        // Hardware test: index 0 is unreliable; 5 % reads reliably at contact and nothing at ~30 cm
+        const val NEARBY_POWER_PERCENT = 5
     }
 
     // ── Connection ───────────────────────────────────────────────────────────
