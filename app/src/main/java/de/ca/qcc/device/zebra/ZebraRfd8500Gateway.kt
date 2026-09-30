@@ -248,7 +248,7 @@ class ZebraRfd8500Gateway @Inject constructor(
         }
     )
 
-    // Reads at minimum power for a short window so only tags directly at the reader answer
+    // Reads at low power (see NEARBY_POWER_PERCENT) for a short window so only tags directly at the reader answer
     private suspend fun readNearby(
         start: (RFIDReader) -> Unit,
         stop: (RFIDReader) -> Unit,
@@ -319,13 +319,19 @@ class ZebraRfd8500Gateway @Inject constructor(
         return Result.failure(IllegalStateException("result=${e.results}, vendor=${e.vendorMessage}"))
     }
 
-    private fun nearbyPowerIndex() = maxPowerIndex * NEARBY_POWER_PERCENT / 100
+    private fun nearbyPowerIndex() =
+        (maxPowerIndex * NEARBY_POWER_PERCENT / 100).coerceIn(MIN_NEARBY_POWER_INDEX, maxPowerIndex)
 
     private companion object {
         const val NEARBY_READ_WINDOW_MS = 700L
 
         // Hardware test: index 0 is unreliable; 5 % reads reliably at contact and nothing at ~30 cm
         const val NEARBY_POWER_PERCENT = 5
+
+        // Percent is of the power index range (dBm table); index 15 of 300 was verified on the
+        // RFD8500. The floor guards the default maxPowerIndex = 200 fallback when capabilities
+        // could not be read.
+        const val MIN_NEARBY_POWER_INDEX = 15
     }
 
     // ── Connection ───────────────────────────────────────────────────────────
