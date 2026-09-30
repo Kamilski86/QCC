@@ -58,4 +58,37 @@
     <string name="ok">OK</string>
     <string name="choose">Choose</string>
     <string name="back">Back</string>
+
+    <string name="find_duplicates">Find duplicates</string>
+    <string name="dup_target_hint">EPC or SGTIN</string>
+    <string name="dup_sgtin_filter">Filter value (SGTIN)</string>
+    <string name="dup_sgtin_filter_hint">Usually 1 (retail item). Only relevant for typed SGTIN.</string>
+    <string name="dup_read_with_reader">Read with reader</string>
+    <string name="dup_hint_capture">Or pull the trigger with the item held to the reader</string>
+    <string name="dup_store_optional">Store (optional)</string>
+    <string name="dup_start_search">Start search</string>
+    <string name="dup_target_sgtin">Target SGTIN</string>
+    <string name="dup_epc">EPC</string>
+    <string name="dup_store">Store</string>
+    <string name="dup_proximity">proximity</string>
+    <string name="dup_hint_hold_trigger">Hold trigger and sweep the reader</string>
+    <string name="dup_hint_continuous">Continuous search active – sweep the reader</string>
+    <string name="dup_continuous">Continuous search</string>
+    <string name="dup_continuous_sub">Search without trigger</string>
+    <string name="dup_found_count">Found (unique TIDs)</string>
+    <string name="dup_last">Last</string>
+    <string name="dup_confirm_find">Confirm find</string>
+    <string name="dup_end_search">End search</string>
+    <string name="dup_msg_saved">Find #%1$d saved – remove the item</string>
+    <string name="dup_msg_already_found">Already found (#%1$d)</string>
+    <string name="dup_msg_no_tag">No duplicate at the reader – wrong item?</string>
+    <string name="dup_msg_multiple">Several duplicates detected – isolate the item</string>
+    <string name="dup_msg_capture_none">No tag detected – hold the item directly to the reader</string>
+    <string name="dup_msg_capture_multiple">Several tags detected – hold a single item to the reader</string>
+    <string name="dup_msg_invalid_target">Enter a 24-character EPC (SGTIN-96) or an SGTIN like 4065546.092768.12884901894</string>
+    <string name="dup_msg_reader_not_connected">Reader not connected</string>
+    <string name="dup_msg_reader_error">Reader error: %1$s</string>
+    <string name="dup_msg_exported">Exported: %1$s</string>
+    <string name="dup_msg_nothing_exported">No duplicates found – nothing exported</string>
+    <string name="dup_msg_export_failed">Export failed: %1$s</string>
 </resources>

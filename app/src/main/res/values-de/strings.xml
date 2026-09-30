@@ -49,4 +49,37 @@
 
     <string name="rfid_power">Antennenleistung</string>
     <string name="apply_power_hint">Empfehlung: niedrige Lesestärke verwenden, damit nur Tags direkt am Reader gelesen werden.</string>
+
+    <string name="find_duplicates">Duplikate finden</string>
+    <string name="dup_target_hint">EPC oder SGTIN</string>
+    <string name="dup_sgtin_filter">Filterwert (SGTIN)</string>
+    <string name="dup_sgtin_filter_hint">Meist 1 (Verkaufsartikel). Nur bei eingetippter SGTIN relevant.</string>
+    <string name="dup_read_with_reader">Mit Pistole anlesen</string>
+    <string name="dup_hint_capture">Oder Trigger drücken, Artikel direkt an der Pistole</string>
+    <string name="dup_store_optional">Filiale (optional)</string>
+    <string name="dup_start_search">Suche starten</string>
+    <string name="dup_target_sgtin">Gesuchte SGTIN</string>
+    <string name="dup_epc">EPC</string>
+    <string name="dup_store">Filiale</string>
+    <string name="dup_proximity">Nähe</string>
+    <string name="dup_hint_hold_trigger">Trigger gedrückt halten und Pistole schwenken</string>
+    <string name="dup_hint_continuous">Dauersuche aktiv – Pistole schwenken</string>
+    <string name="dup_continuous">Dauersuche</string>
+    <string name="dup_continuous_sub">Suche ohne Trigger</string>
+    <string name="dup_found_count">Gefunden (eindeutige TIDs)</string>
+    <string name="dup_last">Zuletzt</string>
+    <string name="dup_confirm_find">Fund bestätigen</string>
+    <string name="dup_end_search">Suche beenden</string>
+    <string name="dup_msg_saved">Fund #%1$d gespeichert – Artikel entfernen</string>
+    <string name="dup_msg_already_found">Bereits gefunden (#%1$d)</string>
+    <string name="dup_msg_no_tag">Kein Duplikat am Reader – falscher Artikel?</string>
+    <string name="dup_msg_multiple">Mehrere Duplikate erkannt – Artikel isolieren</string>
+    <string name="dup_msg_capture_none">Kein Tag erkannt – Artikel direkt an die Pistole halten</string>
+    <string name="dup_msg_capture_multiple">Mehrere Tags erkannt – nur einen Artikel an die Pistole halten</string>
+    <string name="dup_msg_invalid_target">24-stelligen EPC (SGTIN-96) oder SGTIN wie 4065546.092768.12884901894 eingeben</string>
+    <string name="dup_msg_reader_not_connected">Reader nicht verbunden</string>
+    <string name="dup_msg_reader_error">Reader-Fehler: %1$s</string>
+    <string name="dup_msg_exported">Exportiert: %1$s</string>
+    <string name="dup_msg_nothing_exported">Keine Duplikate gefunden – nichts exportiert</string>
+    <string name="dup_msg_export_failed">Export fehlgeschlagen: %1$s</string>
 </resources>
