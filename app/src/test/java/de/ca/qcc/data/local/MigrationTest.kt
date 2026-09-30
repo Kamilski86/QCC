@@ -1,9 +1,12 @@
 package de.ca.qcc.data.local
 
 import android.app.Application
+import android.database.sqlite.SQLiteConstraintException
 import androidx.room.testing.MigrationTestHelper
+import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,6 +46,36 @@ class MigrationTest {
             assertEquals(1, it.getInt(0))
         }
     }
+
+    @Test
+    fun migratedSchema_enforcesUniqueTidAndCascade() {
+        helper.createDatabase(DB_NAME, 6).close()
+        val db = helper.runMigrationsAndValidate(DB_NAME, 7, true, MIGRATION_6_7)
+
+        db.execSQL("PRAGMA foreign_keys=ON")
+        db.execSQL("INSERT INTO duplicate_searches (startedAt, sgtin, epc) VALUES (1, 's', 'e')")
+        db.execSQL("INSERT INTO duplicate_finds (searchId, foundAt, tid, findNo) VALUES (1, 2, 'T1', 1)")
+
+        db.execSQL("INSERT OR IGNORE INTO duplicate_finds (searchId, foundAt, tid, findNo) VALUES (1, 3, 'T1', 2)")
+        assertEquals(1, count(db, "duplicate_finds"))
+
+        var thrown = false
+        try {
+            db.execSQL("INSERT INTO duplicate_finds (searchId, foundAt, tid, findNo) VALUES (1, 3, 'T1', 2)")
+        } catch (e: SQLiteConstraintException) {
+            thrown = true
+        }
+        assertTrue("duplicate TID must violate the unique index", thrown)
+
+        db.execSQL("DELETE FROM duplicate_searches")
+        assertEquals(0, count(db, "duplicate_finds"))
+    }
+
+    private fun count(db: SupportSQLiteDatabase, table: String): Int =
+        db.query("SELECT COUNT(*) FROM $table").use {
+            it.moveToFirst()
+            it.getInt(0)
+        }
 
     private companion object {
         const val DB_NAME = "migration-test"

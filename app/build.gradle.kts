@@ -37,6 +37,7 @@ android {
     }
 
     sourceSets {
+        // Robolectric MigrationTestHelper reads schema JSONs from merged debug assets; debug only, release unaffected.
         getByName("debug").assets.srcDir("$projectDir/schemas")
     }
 

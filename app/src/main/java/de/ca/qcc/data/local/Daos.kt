@@ -35,7 +35,7 @@ interface DuplicateDao {
     @Insert
     suspend fun insertSearch(search: DuplicateSearchEntity): Long
 
-    @Query("SELECT * FROM duplicate_searches WHERE endedAt IS NULL ORDER BY startedAt DESC LIMIT 1")
+    @Query("SELECT * FROM duplicate_searches WHERE endedAt IS NULL ORDER BY startedAt DESC, id DESC LIMIT 1")
     suspend fun getOpenSearch(): DuplicateSearchEntity?
 
     @Query("SELECT * FROM duplicate_searches WHERE id = :id")
@@ -44,7 +44,8 @@ interface DuplicateDao {
     @Query("UPDATE duplicate_searches SET endedAt = :endedAt, exportFileName = :fileName WHERE id = :id")
     suspend fun finishSearch(id: Long, endedAt: Long, fileName: String?)
 
-    @Insert
+    /** Returns -1 if the TID already exists (unique index); the row is not inserted. */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertFind(find: DuplicateFindEntity): Long
 
     @Query("SELECT * FROM duplicate_finds WHERE tid = :tid LIMIT 1")
