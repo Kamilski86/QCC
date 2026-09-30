@@ -18,6 +18,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** Owner must call release() when done. */
 interface ProximityFeedback {
     fun update(proximity: Int)
     fun stop()
@@ -36,7 +37,6 @@ class ToneProximityFeedback @Inject constructor(
     @Volatile private var proximity = 0
     @Volatile private var released = false
     private var loop: Job? = null
-    private var tone: ToneGenerator? = null
 
     private val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         context.getSystemService(VibratorManager::class.java)?.defaultVibrator
@@ -63,34 +63,45 @@ class ToneProximityFeedback @Inject constructor(
     override fun release() {
         released = true
         stop()
-        tone?.release()
-        tone = null
     }
 
+    // The loop owns the ToneGenerator: created lazily here, released when the loop ends.
     private suspend fun beepLoop() {
-        while (currentCoroutineContext().isActive) {
-            val interval = beepIntervalMs(proximity)
-            if (interval == null) {
-                delay(IDLE_POLL_MS)
-                continue
+        var generator: ToneGenerator? = null
+        try {
+            while (currentCoroutineContext().isActive) {
+                val interval = beepIntervalMs(proximity)
+                if (interval == null) {
+                    // Silent: end the loop; update() restarts it. Decide under the lock so a
+                    // concurrent update() cannot be lost between the check and the exit.
+                    val exit = synchronized(this) {
+                        if (beepIntervalMs(proximity) == null) {
+                            loop = null
+                            true
+                        } else false
+                    }
+                    if (exit) return
+                    continue
+                }
+                if (generator == null) {
+                    generator = runCatching { ToneGenerator(AudioManager.STREAM_NOTIFICATION, 90) }.getOrNull()
+                }
+                beep(generator)
+                delay(interval)
             }
-            beep()
-            delay(interval)
+        } finally {
+            generator?.release()
         }
     }
 
-    private fun beep() {
-        runCatching {
-            val generator = tone ?: ToneGenerator(AudioManager.STREAM_NOTIFICATION, 90).also { tone = it }
-            generator.startTone(ToneGenerator.TONE_PROP_BEEP, BEEP_MS)
-        }
+    private fun beep(generator: ToneGenerator?) {
+        runCatching { generator?.startTone(ToneGenerator.TONE_PROP_BEEP, BEEP_MS) }
         runCatching {
             vibrator?.vibrate(VibrationEffect.createOneShot(VIBRATE_MS, VibrationEffect.DEFAULT_AMPLITUDE))
         }
     }
 
     private companion object {
-        const val IDLE_POLL_MS = 100L
         const val BEEP_MS = 40
         const val VIBRATE_MS = 25L
     }
