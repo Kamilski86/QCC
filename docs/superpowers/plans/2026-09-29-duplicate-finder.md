@@ -4,15 +4,17 @@
 
 **Goal:** Neuer Use Case „Find duplicates“: Anwender gibt EPC/SGTIN vor (oder liest ihn mit der RFD8500 an), wird per Nähe-Tacho, Ton und Vibration zu jedem Duplikat geführt, bestätigt jeden Fund per TID und exportiert die Funde als CSV.
 
-**Architecture:** Das Zebra-Gateway bekommt Trigger-Modi (`QCC`/`CAPTURE`/`LOCATE`), Ortung über `Actions.TagLocationing` und kurze Nahbereichs-Lesevorgänge mit minimaler Leistung (EPC bzw. TID-Speicherbank). Ein neues, pro Destination gescoptes `DuplicateSearchViewModel` orchestriert Eingabe, Ortung, TID-Prüfung und Export; Persistenz über zwei neue Room-Tabellen (Schema v7). Außerhalb von `QCC` leitet das Gateway Trigger-Events nicht an den QCC-Ablauf weiter.
+**Architecture:** Das Zebra-Gateway bekommt Trigger-Modi (`QCC`/`CAPTURE`/`LOCATE`), Ortung über `Actions.TagLocationing` (immer exakt, volle Maske) und kurze Nahbereichs-Lesevorgänge mit 5 % der Maximalleistung (EPC bzw. TID-Speicherbank, 96 Bit). Ein neues, pro Destination gescoptes `DuplicateSearchViewModel` orchestriert Eingabe, Ortung, TID-Prüfung und Export; Persistenz über zwei neue Room-Tabellen (Schema v7). Außerhalb von `QCC` leitet das Gateway Trigger-Events nicht an den QCC-Ablauf weiter.
 
 **Tech Stack:** Kotlin, Jetpack Compose/Material3, Hilt, Room 2.6.1, Zebra RFID API3 2.0.5.238, JUnit4, Robolectric 4.14.1, kotlinx-coroutines-test.
 
 **Spec:** `docs/superpowers/specs/2026-09-29-duplicate-finder-design.md`
 
-**Abweichungen von der Spec (in Task 12 in die Spec übernommen):**
+**Abweichungen von der ursprünglichen Spec (nach dem Hardware-Spike am 2026-09-30 bereits in die Spec übernommen):**
 1. Trigger-Weiterleitung passiert im Gateway (nur im Modus `QCC` werden `observeTriggerEvents()` ausgelöst), `ScanViewModel` bleibt unverändert.
 2. In Phase 1 ist der Trigger dauerhaft im Modus `CAPTURE`: Trigger-Druck **oder** Button „Read with reader“ liest sofort.
+3. **SGTIN-Filterwert statt Filter-Maske:** Die RFD8500 akzeptiert nur Masken, die vom MSB an lückenlos 1 sind; eine Maske, die die Filter-Bits ausblendet, wird mit `Invalid EPC Mask` abgelehnt. Bei SGTIN-Eingabe erzeugt die App den EPC daher mit dem Filterwert **1** (Standard, `LocateTarget.DEFAULT_SGTIN_FILTER`), wählbar 0–7 in der UI. Gesucht wird immer exakt mit `LocateTarget.FULL_MASK`. `LocateTarget` hat nur noch `epc` und `sgtin`.
+4. Nahbereichs-Lesen (Anlesen, TID-Prüfung) mit **5 % der Maximalleistung** statt Leistungsindex 0; TID wird mit genau 6 Wörtern (96 Bit) gelesen.
 
 **Konventionen:**
 - Alle Gradle-Befehle vom Repo-Root: `/Users/u092789/00_Development /Android Studio/CaRfidChecker`
@@ -55,7 +57,9 @@
 
 ---
 
-### Task 1: LocateTarget und SGTIN-96-Encoding im Parser
+### Task 1: LocateTarget und SGTIN-96-Encoding im Parser (erledigt, siehe Commits bd0ea0d, 414f66d, 75be11a)
+
+> **Historisch:** Der Code in diesem Task zeigt den ursprünglichen Stand mit `mask`/`filterMasked`/`FILTER_IGNORING_MASK`. Durch Commit 75be11a (nach dem Hardware-Spike) gilt stattdessen: `data class LocateTarget(val epc: String, val sgtin: String)` mit `FULL_MASK` und `DEFAULT_SGTIN_FILTER = 1`; `Gs1ParserService.parseLocateTarget(input: String, sgtinFilter: Int = LocateTarget.DEFAULT_SGTIN_FILTER)`. Maßgeblich ist der Code im Repository.
 
 **Files:**
 - Modify: `app/src/main/java/de/ca/qcc/domain/model/Models.kt`
@@ -275,7 +279,9 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 2: Gateway – Trigger-Modi, Ortung, Nahbereichs-Lesen
+### Task 2: Gateway – Trigger-Modi, Ortung, Nahbereichs-Lesen (erledigt, siehe Commits 55dbb0d, 4175b79, 857f7fd)
+
+> **Historisch:** Die Signaturen des Interfaces gelten unverändert (`startLocate(epc, mask)`, `readTidsNearby(epc, mask)`, `readEpcsNearby()` …); Aufrufer übergeben ab jetzt immer `LocateTarget.FULL_MASK`. Abweichend vom Code unten liest das Gateway nach Commit 857f7fd mit 5 % der Maximalleistung (`NEARBY_POWER_PERCENT = 5`) und die TID mit `count = 6` (96 Bit). Maßgeblich ist der Code im Repository.
 
 Kein Unit-Test möglich (Zebra-SDK braucht Hardware). Verifikation: Kompilieren + Hardware-Spike in Task 3.
 
@@ -569,7 +575,9 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-### Task 3: Hardware-Spike (Risiko R1) – wird NICHT committet
+### Task 3: Hardware-Spike (Risiko R1) – wird NICHT committet (erledigt am 2026-09-30; Folgeänderungen in Commits 75be11a, 857f7fd)
+
+> **Historisch:** Der Spike-Code unten verwendet noch `LocateTarget.FILTER_IGNORING_MASK`, das inzwischen entfernt ist. Ergebnisse siehe Abschnitt „Ergebnis“ am Ende dieses Tasks.
 
 Ziel: Auf echter RFD8500 + CT37 prüfen, dass Ortung (exakt + maskiert), EPC-Anlesen und TID-Lesen funktionieren, **bevor** DB und UI darauf aufbauen. Spike-Code wird nach der Prüfung wieder gelöscht.
 
@@ -741,6 +749,32 @@ git commit -m "docs: record duplicate finder hardware spike results
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
+#### Ergebnis (Hardware-Spike 2026-09-30, RFD8500 + CT37)
+
+| # | Prüfung | Ergebnis |
+|---|---|---|
+| a | EPC anlesen mit Leistungsindex 0 | unzuverlässig (ca. 2 von 6 Versuchen) |
+| a' | EPC anlesen mit 5 % der Maximalleistung (Index 15 von 300) | zuverlässig (3/3 direkt an der Pistole) |
+| b | 5 % Leistung, Artikel ca. 30 cm entfernt | nichts gelesen (gewünscht) |
+| c | Trigger-Events in Nicht-QCC-Modus | pressed=true/false kommen zuverlässig an |
+| d | TagLocationing exakt (Maske 24×F) | funktioniert, 4–5 Werte/s, 38–99 je nach Abstand |
+| e | TagLocationing mit Maske `FF1F…` (Filterbits ausgeblendet) | Fehler `Invalid EPC Mask` |
+| e' | Masken `F×12 + 0×12` und `F×23 + 0` | akzeptiert und funktionieren (max 91 / 83) |
+| e'' | Maske `FF00 + F×20` | `Invalid EPC Mask` |
+| f | TID lesen (TID-Bank, offset 0, count 0) | funktioniert, liefert aber 96-Bit-TID + 12 angehängte Nullen: `E280119120006EFD14DA033D000000000000` |
+| g | Zwei Duplikate gleichzeitig | nicht getestet (nur ein Duplikat verfügbar) → in Task 11 nachholen |
+| h | QCC-Ablauf danach | unverändert, funktioniert |
+
+Echter Duplikat-EPC: `3034F8242800C10300000011` → Filterwert **1**, Partition 5.
+
+Entscheidungen:
+1. Die RFD8500 akzeptiert nur Masken, die vom MSB an lückenlos 1 sind. Die Filterbit-Maske ist nicht umsetzbar.
+2. Bei SGTIN-Eingabe verwendet die App den Filterwert **1** als Standard, mit Auswahl **0–7** in der UI. Gesucht wird immer exakt (volle Maske). `FILTER_IGNORING_MASK` und `filterMasked` entfallen (Commit 75be11a).
+3. Nahbereichs-Lesen (Anlesen + TID-Prüfung) mit 5 % der Maximalleistung statt Index 0 (Commit 857f7fd).
+4. TID mit genau 6 Wörtern (96 Bit) statt `count = 0` (Commit 857f7fd).
+
+Die Spec ist entsprechend aktualisiert (Abschnitte 3, 4, 5, 8, 10).
+
 ---
 
 ### Task 4: Room – Tabellen, DAO, Migration 6 → 7
@@ -817,7 +851,7 @@ class MigrationTest {
             it.moveToFirst()
             assertEquals(1, it.getInt(0))
         }
-        db.execSQL("INSERT INTO duplicate_searches (startedAt, sgtin, epc, filterMasked) VALUES (1, 's', 'e', 0)")
+        db.execSQL("INSERT INTO duplicate_searches (startedAt, sgtin, epc) VALUES (1, 's', 'e')")
         db.execSQL("INSERT INTO duplicate_finds (searchId, foundAt, tid, findNo) VALUES (1, 2, 'T1', 1)")
         db.query("SELECT COUNT(*) FROM duplicate_finds").use {
             it.moveToFirst()
@@ -855,7 +889,6 @@ data class DuplicateSearchEntity(
     val endedAt: Long? = null,
     val sgtin: String,
     val epc: String,
-    val filterMasked: Boolean,
     val store: String? = null,
     val exportFileName: String? = null
 )
@@ -956,7 +989,6 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
                 `endedAt` INTEGER,
                 `sgtin` TEXT NOT NULL,
                 `epc` TEXT NOT NULL,
-                `filterMasked` INTEGER NOT NULL,
                 `store` TEXT,
                 `exportFileName` TEXT
             )"""
@@ -1069,11 +1101,10 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34], application = Application::class)
 class DuplicateSearchRepositoryTest {
 
+    // SGTIN encoded with the default filter value 1
     private val target = LocateTarget(
-        epc = "3014F824285A980300000006",
-        sgtin = "4065546.092768.12884901894",
-        mask = LocateTarget.FILTER_IGNORING_MASK,
-        filterMasked = true
+        epc = "3034F824285A980300000006",
+        sgtin = "4065546.092768.12884901894"
     )
 
     private lateinit var db: AppDatabase
@@ -1134,7 +1165,7 @@ class DuplicateSearchRepositoryTest {
         val lines = writer.files.getValue(fileName).trim().lines()
         assertEquals("Timestamp,SGTIN,EPC,TID,Find No,Store", lines[0])
         assertEquals(3, lines.size)
-        assertTrue(lines[1].endsWith(",4065546.092768.12884901894,3014F824285A980300000006,E280AA,1,0815"))
+        assertTrue(lines[1].endsWith(",4065546.092768.12884901894,3034F824285A980300000006,E280AA,1,0815"))
         assertTrue(lines[2].endsWith(",E280BB,2,0815"))
         assertNull(repository.getOpenSearch())
     }
@@ -1272,7 +1303,6 @@ class DuplicateSearchRepository @Inject constructor(
                 startedAt = System.currentTimeMillis(),
                 sgtin = target.sgtin,
                 epc = target.epc,
-                filterMasked = target.filterMasked,
                 store = store
             )
         )
@@ -1318,12 +1348,8 @@ class DuplicateSearchRepository @Inject constructor(
         return fileName
     }
 
-    private fun DuplicateSearchEntity.toTarget() = LocateTarget(
-        epc = epc,
-        sgtin = sgtin,
-        mask = if (filterMasked) LocateTarget.FILTER_IGNORING_MASK else LocateTarget.FULL_MASK,
-        filterMasked = filterMasked
-    )
+    // The stored EPC already carries the chosen filter value; locating is always exact
+    private fun DuplicateSearchEntity.toTarget() = LocateTarget(epc = epc, sgtin = sgtin)
 }
 
 // Column headers stay English regardless of app language
@@ -1688,7 +1714,8 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34], application = Application::class)
 class DuplicateSearchViewModelTest {
 
-    private val epc = "3014F824285A980300000006"
+    // SGTIN input with the default filter value 1 encodes to exactly this EPC
+    private val epc = "3034F824285A980300000006"
     private val sgtin = "4065546.092768.12884901894"
     private val tid = "E2801191A503006B7A41A41F"
 
@@ -1750,7 +1777,7 @@ class DuplicateSearchViewModelTest {
 
     @Test
     fun capture_withSeveralTags_asksToIsolate() {
-        reader.epcsNearby = Result.success(listOf(epc, "3014F824285A980300000007"))
+        reader.epcsNearby = Result.success(listOf(epc, "3034F824285A980300000007"))
         val vm = createViewModel()
 
         vm.captureFromReader()
@@ -1780,6 +1807,44 @@ class DuplicateSearchViewModelTest {
     }
 
     @Test
+    fun sgtinInput_withDefaultFilter_encodesFilterOne() {
+        val vm = createViewModel()
+
+        vm.onInputChange(sgtin)
+        vm.applyInput()
+
+        assertEquals(LocateTarget.DEFAULT_SGTIN_FILTER, vm.uiState.value.sgtinFilter)
+        assertEquals("3034F824285A980300000006", vm.uiState.value.target?.epc)
+        assertEquals(sgtin, vm.uiState.value.target?.sgtin)
+    }
+
+    @Test
+    fun sgtinInput_withFilterZero_encodesFilterZero() {
+        val vm = createViewModel()
+
+        vm.onSgtinFilterChange(0)
+        vm.onInputChange(sgtin)
+        vm.applyInput()
+
+        assertEquals(0, vm.uiState.value.sgtinFilter)
+        assertEquals("3014F824285A980300000006", vm.uiState.value.target?.epc)
+    }
+
+    @Test
+    fun changingSgtinFilter_clearsExistingTarget() {
+        val vm = createViewModel()
+        vm.onInputChange(sgtin)
+        vm.applyInput()
+        assertNotNull(vm.uiState.value.target)
+
+        vm.onSgtinFilterChange(2)
+
+        assertNull(vm.uiState.value.target)
+        assertNull(vm.uiState.value.message)
+        assertEquals(2, vm.uiState.value.sgtinFilter)
+    }
+
+    @Test
     fun startSearch_switchesToLocateMode_andRemembersStore() {
         val vm = createViewModel()
         vm.onStoreChange(" 0815 ")
@@ -1804,12 +1869,12 @@ class DuplicateSearchViewModelTest {
     }
 
     @Test
-    fun holdingTrigger_locatesWithFilterMask_andDrivesFeedback() = runTest {
+    fun holdingTrigger_locatesExactly_andDrivesFeedback() = runTest {
         val vm = createViewModel()
         vm.startSearchFor(sgtin)
 
         reader.trigger.emit(true)
-        assertEquals(epc to LocateTarget.FILTER_IGNORING_MASK, reader.locateCalls.last())
+        assertEquals(epc to LocateTarget.FULL_MASK, reader.locateCalls.last())
         assertTrue(vm.uiState.value.locating)
 
         reader.proximity.emit(70)
@@ -1896,6 +1961,7 @@ class DuplicateSearchViewModelTest {
     fun endSearch_withFinds_exports_andReturnsToTargetPhase() {
         val vm = createViewModel()
         vm.onStoreChange("0815")
+        vm.onSgtinFilterChange(3)
         vm.startSearchFor(epc)
         reader.tidsNearby = Result.success(listOf(tid))
         vm.confirmFind()
@@ -1908,6 +1974,7 @@ class DuplicateSearchViewModelTest {
         assertEquals(DuplicatePhase.TARGET, state.phase)
         assertNull(state.target)
         assertEquals("0815", state.store)
+        assertEquals(3, state.sgtinFilter)
         assertEquals(TriggerMode.CAPTURE, reader.mode)
     }
 
@@ -1924,7 +1991,7 @@ class DuplicateSearchViewModelTest {
 
     @Test
     fun openSearch_isResumedOnStart() = runTest {
-        val target = LocateTarget(epc, sgtin, LocateTarget.FULL_MASK, filterMasked = false)
+        val target = LocateTarget(epc, sgtin)
         val id = repository.startSearch(target, store = "0815")
         repository.registerFind(id, tid)
 
@@ -2006,6 +2073,7 @@ sealed interface DuplicateMessage {
 data class DuplicateUiState(
     val phase: DuplicatePhase = DuplicatePhase.TARGET,
     val input: String = "",
+    val sgtinFilter: Int = LocateTarget.DEFAULT_SGTIN_FILTER,
     val target: LocateTarget? = null,
     val store: String = "",
     val searchId: Long? = null,
@@ -2082,10 +2150,15 @@ class DuplicateSearchViewModel @Inject constructor(
     fun onInputChange(text: String) =
         _uiState.update { it.copy(input = text, target = null, message = null) }
 
+    // Only affects typed SGTINs; a hex EPC carries its own filter value
+    fun onSgtinFilterChange(filter: Int) =
+        _uiState.update { it.copy(sgtinFilter = filter, target = null, message = null) }
+
     fun onStoreChange(text: String) = _uiState.update { it.copy(store = text) }
 
     fun applyInput() {
-        runCatching { parser.parseLocateTarget(_uiState.value.input) }
+        val state = _uiState.value
+        runCatching { parser.parseLocateTarget(state.input, state.sgtinFilter) }
             .onSuccess { target -> _uiState.update { it.copy(target = target, message = null) } }
             .onFailure { _uiState.update { it.copy(target = null, message = DuplicateMessage.InvalidTarget) } }
     }
@@ -2155,7 +2228,7 @@ class DuplicateSearchViewModel @Inject constructor(
         _uiState.update { it.copy(busy = true, message = null) }
         viewModelScope.launch {
             stopLocating()
-            val message = rfid.readTidsNearby(target.epc, target.mask).fold(
+            val message = rfid.readTidsNearby(target.epc, LocateTarget.FULL_MASK).fold(
                 onSuccess = { tids ->
                     when (tids.size) {
                         0 -> DuplicateMessage.NoTagAtReader
@@ -2181,6 +2254,7 @@ class DuplicateSearchViewModel @Inject constructor(
                 .onSuccess { fileName ->
                     val current = _uiState.value
                     _uiState.value = DuplicateUiState(
+                        sgtinFilter = current.sgtinFilter,
                         store = current.store,
                         readerConnected = current.readerConnected,
                         message = fileName?.let { DuplicateMessage.Exported(it) }
@@ -2229,7 +2303,7 @@ class DuplicateSearchViewModel @Inject constructor(
         val target = state.target ?: return
         if (state.locating || state.phase != DuplicatePhase.SEARCH) return
         _uiState.update { it.copy(locating = true) }
-        rfid.startLocate(target.epc, target.mask).onFailure { e ->
+        rfid.startLocate(target.epc, LocateTarget.FULL_MASK).onFailure { e ->
             _uiState.update { it.copy(locating = false, continuous = false, message = e.toReaderError()) }
         }
     }
@@ -2282,6 +2356,8 @@ In `app/src/main/res/values/strings.xml` vor `</resources>` einfügen:
 ```xml
     <string name="find_duplicates">Find duplicates</string>
     <string name="dup_target_hint">EPC or SGTIN</string>
+    <string name="dup_sgtin_filter">Filter value (SGTIN)</string>
+    <string name="dup_sgtin_filter_hint">Usually 1 (retail item). Only relevant for typed SGTIN.</string>
     <string name="dup_read_with_reader">Read with reader</string>
     <string name="dup_hint_capture">Or pull the trigger with the item held to the reader</string>
     <string name="dup_store_optional">Store (optional)</string>
@@ -2319,6 +2395,8 @@ In `app/src/main/res/values-de/strings.xml` vor `</resources>` einfügen:
 ```xml
     <string name="find_duplicates">Duplikate finden</string>
     <string name="dup_target_hint">EPC oder SGTIN</string>
+    <string name="dup_sgtin_filter">Filterwert (SGTIN)</string>
+    <string name="dup_sgtin_filter_hint">Meist 1 (Verkaufsartikel). Nur bei eingetippter SGTIN relevant.</string>
     <string name="dup_read_with_reader">Mit Pistole anlesen</string>
     <string name="dup_hint_capture">Oder Trigger drücken, Artikel direkt an der Pistole</string>
     <string name="dup_store_optional">Filiale (optional)</string>
@@ -2356,6 +2434,8 @@ In `app/src/main/res/values-pl/strings.xml` vor `</resources>` einfügen:
 ```xml
     <string name="find_duplicates">Znajdź duplikaty</string>
     <string name="dup_target_hint">EPC lub SGTIN</string>
+    <string name="dup_sgtin_filter">Wartość filtra (SGTIN)</string>
+    <string name="dup_sgtin_filter_hint">Zwykle 1 (artykuł detaliczny). Dotyczy tylko wpisanego SGTIN.</string>
     <string name="dup_read_with_reader">Odczytaj czytnikiem</string>
     <string name="dup_hint_capture">Lub naciśnij spust, trzymając artykuł przy czytniku</string>
     <string name="dup_store_optional">Sklep (opcjonalnie)</string>
@@ -2507,6 +2587,7 @@ fun ProximityGauge(proximity: Int, active: Boolean, modifier: Modifier = Modifie
 ```kotlin
 package de.ca.qcc.feature.duplicates
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -2516,6 +2597,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -2525,6 +2607,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -2551,6 +2635,7 @@ import de.ca.qcc.R
 fun DuplicateSearchScreen(
     state: DuplicateUiState,
     onInputChange: (String) -> Unit,
+    onSgtinFilterChange: (Int) -> Unit,
     onApplyInput: () -> Unit,
     onCapture: () -> Unit,
     onStoreChange: (String) -> Unit,
@@ -2605,6 +2690,15 @@ fun DuplicateSearchScreen(
                             keyboardActions = KeyboardActions(onDone = { onApplyInput() }),
                             modifier = Modifier.fillMaxWidth()
                         )
+                        // Filter value only matters for a typed SGTIN (gcp.itemRef.serial)
+                        if (state.input.contains('.')) {
+                            Spacer(Modifier.height(8.dp))
+                            SgtinFilterSelector(
+                                selected = state.sgtinFilter,
+                                enabled = !state.busy,
+                                onSelect = onSgtinFilterChange
+                            )
+                        }
                         Spacer(Modifier.height(8.dp))
                         Button(
                             onClick = onApplyInput,
@@ -2751,6 +2845,38 @@ private fun WhiteCard(content: @Composable androidx.compose.foundation.layout.Co
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SgtinFilterSelector(selected: Int, enabled: Boolean, onSelect: (Int) -> Unit) {
+    Text(stringResource(R.string.dup_sgtin_filter), style = MaterialTheme.typography.labelSmall, color = Color.Black)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+    ) {
+        (0..7).forEach { value ->
+            FilterChip(
+                selected = value == selected,
+                onClick = { onSelect(value) },
+                enabled = enabled,
+                label = { Text("$value", fontWeight = FontWeight.Medium) },
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = Color.White,
+                    labelColor = Color.Black,
+                    selectedContainerColor = Color.Black,
+                    selectedLabelColor = Color.White
+                )
+            )
+        }
+    }
+    Text(
+        stringResource(R.string.dup_sgtin_filter_hint),
+        style = MaterialTheme.typography.labelSmall,
+        color = Color(0xFF555555)
+    )
+}
+
 @Composable
 private fun LabeledValue(label: String, value: String, monospace: Boolean = false) {
     Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Black)
@@ -2885,6 +3011,7 @@ Im `NavHost` nach `composable(Screen.Dashboard.route) { … }` einfügen:
                 DuplicateSearchScreen(
                     state = state,
                     onInputChange = duplicateViewModel::onInputChange,
+                    onSgtinFilterChange = duplicateViewModel::onSgtinFilterChange,
                     onApplyInput = duplicateViewModel::applyInput,
                     onCapture = duplicateViewModel::captureFromReader,
                     onStoreChange = duplicateViewModel::onStoreChange,
@@ -2939,7 +3066,9 @@ Expected: `Success`, App startet (DB-Migration 6 → 7 läuft beim Start auf dem
 |---|---|---|
 | 1 | App-Sprache Englisch, Drawer | Eintrag „Find duplicates“ |
 | 2 | Artikel an Pistole, Trigger drücken | EPC im Feld, SGTIN/EPC-Karte sichtbar |
-| 3 | SGTIN manuell tippen, „Apply“ | Karte mit SGTIN + EPC (Filter 0) |
+| 3 | SGTIN manuell tippen | Filterauswahl 0–7 erscheint unter dem Feld, 1 ist vorausgewählt; bei EPC-Eingabe (ohne Punkt) keine Filterauswahl |
+| 3a | SGTIN `4065546.000772.12884901905` (echtes Duplikat, EPC `3034F8242800C10300000011`) tippen, Filter auf 0 stellen, „Apply“ | Karte zeigt EPC `3014F8242800C10300000011` (würde den echten Tag nicht finden) |
+| 3b | Filter zurück auf 1 stellen | SGTIN/EPC-Karte verschwindet sofort; nach „Apply“ zeigt sie EPC `3034F8242800C10300000011` – mit diesem Ziel weiter in Schritt 4, in Schritt 5 führt die Ortung zum echten Tag |
 | 4 | Filiale eintragen, „Start search“ | Suchphase, Filiale in Karte |
 | 5 | Trigger halten, auf Duplikat zu bewegen | Tacho steigt, Piepen schneller, Vibration |
 | 6 | Trigger loslassen | Tacho 0, still |
@@ -2947,7 +3076,8 @@ Expected: `Success`, App startet (DB-Migration 6 → 7 läuft beim Start auf dem
 | 8 | Duplikat herausnehmen, an Pistole, „Confirm find“ | „Find #1 saved – remove the item“, Suche läuft weiter |
 | 9 | Denselben Artikel erneut bestätigen | „Already found (#1)“ |
 | 10 | Nicht-Duplikat an Pistole, bestätigen | „No duplicate at the reader – wrong item?“ |
-| 11 | Zwei Duplikate zusammen, bestätigen | „Several duplicates detected – isolate the item“ |
+| 11 | Zwei Duplikate zusammen an die Pistole, bestätigen (im Spike Schritt g nicht getestet, hier nachholen) | „Several duplicates detected – isolate the item“ |
+| 11a | Anlesen und „Confirm find“ mehrfach direkt an der Pistole (5 % Leistung) | zuverlässig gelesen (mind. 5 von 5); Artikel ca. 30 cm entfernt wird nicht gelesen |
 | 12 | App in Hintergrund und zurück | Suche gestoppt, Schalter aus, Suche offen |
 | 13 | App beenden (Recents wegwischen), neu öffnen, „Find duplicates“ | offene Suche wird fortgesetzt |
 | 14 | „End search“ | „Exported: duplicates_….csv“; Datei in Documents mit korrekten Spalten |
@@ -2962,34 +3092,30 @@ Jede fehlgeschlagene Prüfung → mit `superpowers:systematic-debugging` Ursache
 
 ### Task 12: Dokumentation nachziehen
 
+Die Spec wurde bereits nach dem Hardware-Spike (2026-09-30) an die Umsetzung angeglichen: SGTIN-Filterwert 1 mit Auswahl 0–7 und exakter Suche, Nahbereichs-Lesen mit 5 % der Maximalleistung, TID 96 Bit, Trigger-Weiterleitung im Gateway (`ScanViewModel` unverändert), sofortiges Anlesen per Trigger in Phase 1, keine eigene Spalte für Filter-Maskierung in `duplicate_searches`, Spike-Ergebnis bei R1. Hier bleibt nur der Abschluss.
+
 **Files:**
 - Modify: `docs/superpowers/specs/2026-09-29-duplicate-finder-design.md`
 - Modify: `CLAUDE.md`
 
-- [ ] **Step 1: Spec an Umsetzung angleichen**
+- [ ] **Step 1: Spec-Status setzen**
 
-In der Spec:
-1. Abschnitt 3, Phase 1, Bullet „Button ‚Read with reader‘“ ersetzen durch:
-   `- In Phase 1 steht der Trigger im Modus CAPTURE: Trigger-Druck oder Button „Read with reader“ liest sofort genau einen Tag mit minimaler Leistung und übernimmt dessen EPC. Werden mehrere Tags gelesen, erscheint ein Hinweis, den Artikel zu isolieren.`
-2. Abschnitt 4, Bullet `QCC` ersetzen durch:
-   `- QCC (Standard): unverändertes Verhalten. Das Gateway löst observeTriggerEvents() und den Single-Tag-Scan nur in diesem Modus aus; ScanViewModel bleibt unverändert.`
-3. Abschnitt 8, Zeile `feature/scan/ScanViewModel` löschen.
-4. Abschnitt 9, Bullet „ScanViewModel ignoriert Trigger außerhalb von QCC“ ersetzen durch: `QCC-Trigger-Verhalten unverändert (Hardware-Checkliste)`.
-5. Status auf `Umgesetzt` setzen.
+In der Spec die Zeile `- Status: Freigegeben, angepasst nach Hardware-Spike (2026-09-30)` ersetzen durch `- Status: Umgesetzt`. Falls die Hardware-Abnahme (Task 11) weitere Abweichungen ergeben hat, diese in den betroffenen Abschnitten nachtragen.
 
 - [ ] **Step 2: CLAUDE.md aktualisieren**
 
 In `CLAUDE.md`:
 1. Abschnitt „Database“: `schema version 6` → `schema version 7`; Satz „Two tables: …“ ersetzen durch: `Four tables: scans (every comparison result), mismatches (mismatch-only subset), duplicate_searches and duplicate_finds (duplicate finder; TID is globally unique).`
-2. Abschnitt „Key architectural decisions“, Absatz „Zebra gateway is single-tag mode by design.“ ergänzen um: `The gateway also has trigger modes (QCC / CAPTURE / LOCATE, see TriggerMode). Only QCC runs the single-tag scan and emits observeTriggerEvents(); the duplicate finder uses CAPTURE/LOCATE via observeHandheldTrigger(), TagLocationing and minimum-power nearby reads.`
-3. Unter „Navigation“ ergänzen: `The duplicate finder (feature/duplicates, route "duplicates") scopes its ViewModel to its destination and resets the trigger mode to QCC on ON_STOP.`
-4. Im Abschnitt „Build Commands“ unter den Test-Befehlen ergänzen: `Unit tests use Robolectric + in-memory Room (see app/src/test/.../testutil).`
+2. Abschnitt „Key architectural decisions“, Absatz „Zebra gateway is single-tag mode by design.“ ergänzen um: `The gateway also has trigger modes (QCC / CAPTURE / LOCATE, see TriggerMode). Trigger routing happens in the gateway: only QCC runs the single-tag scan and emits observeTriggerEvents(), so ScanViewModel is unchanged. The duplicate finder uses CAPTURE/LOCATE via observeHandheldTrigger(), TagLocationing (always exact, full mask – the RFD8500 only accepts masks that are contiguous from the MSB) and nearby reads at 5 % of max power (EPC capture, 96-bit TID).`
+3. Abschnitt „Key architectural decisions“, Absatz „GS1 parsing is fully in Gs1ParserService.“, Liste ergänzen um: `- Locate target from hex EPC or typed SGTIN (parseLocateTarget); a typed SGTIN is encoded as SGTIN-96 with an explicit filter value (default 1, selectable 0–7 in the UI)`.
+4. Unter „Navigation“ ergänzen: `The duplicate finder (feature/duplicates, route "duplicates") scopes its ViewModel to its destination and resets the trigger mode to QCC on ON_STOP. In its target phase the trigger is in CAPTURE mode and reads a tag immediately.`
+5. Im Abschnitt „Build Commands“ unter den Test-Befehlen ergänzen: `Unit tests use Robolectric + in-memory Room (see app/src/test/.../testutil).`
 
 - [ ] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-09-29-duplicate-finder-design.md CLAUDE.md
-git commit -m "docs: update spec and CLAUDE.md for duplicate finder
+git commit -m "docs: update spec status and CLAUDE.md for duplicate finder
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
