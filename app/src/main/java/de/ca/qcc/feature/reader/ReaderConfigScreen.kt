@@ -14,6 +14,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -107,7 +108,16 @@ fun ReaderConfigScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(stringResource(R.string.rfid_power), fontWeight = FontWeight.Bold, color = Color.Black)
-                    Text("${powerLevel.toInt()} dBm", color = Color.Black, fontWeight = FontWeight.Medium)
+                    Text(
+                        stringResource(R.string.rfid_power_level, powerLevel.toInt()),
+                        color = Color.Black,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        stringResource(R.string.apply_power_hint),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Black
+                    )
                 }
             }
         }

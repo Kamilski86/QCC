@@ -15,6 +15,9 @@
     <string name="qr_gtin">QR SGTIN</string>
     <string name="rfid_gtin">RFID SGTIN</string>
 
+    <string name="match">Match</string>
+    <string name="mismatch">Mismatch</string>
+    <string name="ok">OK</string>
     <string name="reset">Reset</string>
 
     <string name="reader_settings">Reader-Einstellungen</string>
@@ -27,6 +30,7 @@
 
     <string name="rfid_power">Antennenleistung</string>
     <string name="apply_power_hint">Empfehlung: niedrige Lesestärke verwenden, damit nur Tags direkt am Reader gelesen werden.</string>
+    <string name="rfid_power_level">Stufe %1$d von 30</string>
 
     <string name="find_duplicates">Duplikate finden</string>
     <string name="dup_target_hint">EPC oder SGTIN</string>
