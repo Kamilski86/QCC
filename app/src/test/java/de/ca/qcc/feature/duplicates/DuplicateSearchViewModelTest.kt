@@ -504,4 +504,41 @@ class DuplicateSearchViewModelTest {
 
         assertFalse(vm.uiState.value.continuous)
     }
+
+    @Test
+    fun staleViewModelStopping_doesNotResetModeOfNewerViewModel() {
+        // Quick Duplicates -> Dashboard -> Duplicates: the old destination is torn down
+        // after the new one has started and must not hand the trigger back to QCC
+        val old = createViewModel()
+        val current = createViewModel()
+        current.onScreenStarted()
+
+        old.onScreenStopped()
+
+        assertEquals(TriggerMode.CAPTURE, reader.mode)
+    }
+
+    @Test
+    fun screenStoppedTwice_doesNotResetModeOfNewerViewModel() {
+        val old = createViewModel()
+        old.onScreenStopped()
+        val current = createViewModel()
+
+        old.onScreenStopped() // ON_STOP and onDispose both report the same stop
+
+        assertEquals(TriggerMode.CAPTURE, reader.mode)
+        assertNotNull(current)
+    }
+
+    @Test
+    fun continuousRequestedAfterScreenStopped_doesNotStartLocating() {
+        val vm = createViewModel()
+        vm.startSearchFor("4065546.092768.12884901894")
+        vm.onScreenStopped()
+
+        vm.setContinuous(true)
+
+        assertFalse(reader.locating)
+        assertTrue(reader.locateCalls.isEmpty())
+    }
 }

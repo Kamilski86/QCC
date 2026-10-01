@@ -148,4 +148,23 @@ class ScanViewModelTest {
         assertEquals(ComparisonStatus.IDLE, state.comparison.status)
         assertEquals(1, scanCount())
     }
+
+    @Test
+    fun scansWhileSuspended_areIgnored_andResumeWorks() = runTest {
+        viewModel.setSuspended(true)
+
+        barcode.scans.emit(validQr)
+        rfid.tags.emit(matchingEpc)
+
+        assertNull(viewModel.uiState.value.qr)
+        assertNull(viewModel.uiState.value.rfid)
+        assertEquals(0, scanCount())
+
+        viewModel.setSuspended(false)
+        barcode.scans.emit(validQr)
+        rfid.tags.emit(matchingEpc)
+
+        assertEquals(ComparisonStatus.MATCH, viewModel.uiState.value.comparison.status)
+        assertEquals(1, scanCount())
+    }
 }

@@ -83,19 +83,24 @@ class ScanViewModel @Inject constructor(
         tone = null
     }
 
+    // Set while another use case (duplicate finder) owns the scanners; QCC then ignores their events
+    @Volatile private var suspended = false
+
+    fun setSuspended(value: Boolean) { suspended = value }
+
     private val _uiState = MutableStateFlow(ScanUiState())
     val uiState: StateFlow<ScanUiState> = _uiState.asStateFlow()
 
     init {
         viewModelScope.launch {
             barcodeScanner.observeScans().collect { raw ->
-                handleQr(raw)
+                if (!suspended) handleQr(raw)
             }
         }
 
         viewModelScope.launch {
             rfidReader.observeTagScans().collect { epc ->
-                handleRfid(epc)
+                if (!suspended) handleRfid(epc)
             }
         }
 
@@ -114,6 +119,7 @@ class ScanViewModel @Inject constructor(
         // NEW: Listen to Zebra trigger and start both scans
         viewModelScope.launch {
             rfidReader.observeTriggerEvents().collect {
+                if (suspended) return@collect
                 // Zebra trigger pressed - start both QR and RFID scanning
                 triggerQrScan()
                 triggerRfidScan()

@@ -123,12 +123,12 @@ class DuplicateSearchViewModel @Inject constructor(
         screenActive = false
         _uiState.update { it.copy(continuous = false) }
         viewModelScope.launch { stopLocating() }
-        rfid.setTriggerMode(TriggerMode.QCC)
+        rfid.releaseTriggerMode(this)
     }
 
     override fun onCleared() {
         feedback.release()
-        rfid.setTriggerMode(TriggerMode.QCC)
+        rfid.releaseTriggerMode(this)
     }
 
     // ── Phase 1: target ──
@@ -301,7 +301,8 @@ class DuplicateSearchViewModel @Inject constructor(
     private suspend fun startLocating() = locateMutex.withLock {
         val state = _uiState.value
         val target = state.target ?: return@withLock
-        if (state.locating || state.phase != DuplicatePhase.SEARCH) return@withLock
+        // A late request (continuous toggle, confirm) must not revive locating after leaving
+        if (!screenActive || state.locating || state.phase != DuplicatePhase.SEARCH) return@withLock
         _uiState.update { it.copy(locating = true) }
         rfid.startLocate(target.epc, LocateTarget.FULL_MASK).onFailure { e ->
             _uiState.update { it.copy(locating = false, continuous = false, message = e.toReaderError()) }
@@ -319,12 +320,13 @@ class DuplicateSearchViewModel @Inject constructor(
     }
 
     private fun applyTriggerMode() {
-        rfid.setTriggerMode(
-            when {
-                !screenActive -> TriggerMode.QCC
-                _uiState.value.phase == DuplicatePhase.SEARCH -> TriggerMode.LOCATE
-                else -> TriggerMode.CAPTURE
-            }
+        if (!screenActive) {
+            rfid.releaseTriggerMode(this)
+            return
+        }
+        rfid.claimTriggerMode(
+            this,
+            if (_uiState.value.phase == DuplicatePhase.SEARCH) TriggerMode.LOCATE else TriggerMode.CAPTURE
         )
     }
 

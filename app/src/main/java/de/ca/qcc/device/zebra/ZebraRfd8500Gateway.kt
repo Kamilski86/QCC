@@ -1,6 +1,7 @@
 package de.ca.qcc.device.zebra
 
 import android.content.Context
+import android.util.Log
 import com.zebra.rfid.api3.ACCESS_OPERATION_CODE
 import com.zebra.rfid.api3.ACCESS_OPERATION_STATUS
 import com.zebra.rfid.api3.AccessFilter
@@ -107,7 +108,18 @@ class ZebraRfd8500Gateway @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    private val triggerArbiter = TriggerModeArbiter()
+
+    override fun claimTriggerMode(owner: Any, mode: TriggerMode) =
+        setTriggerMode(triggerArbiter.claim(owner, mode))
+
+    override fun releaseTriggerMode(owner: Any) {
+        triggerArbiter.release(owner)?.let { setTriggerMode(it) }
+            ?: Log.d(TAG, "releaseTriggerMode ignored: $owner no longer owns the trigger")
+    }
+
     override fun setTriggerMode(mode: TriggerMode) {
+        Log.d(TAG, "triggerMode $triggerMode -> $mode (locateActive=${locateActive.get()}, inventoryActive=${inventoryActive.get()})")
         triggerMode = mode
         // Never leave locate running in QCC mode: eventReadNotify routes reads into the
         // locate branch while locateActive, which would swallow QCC tag reads
@@ -195,7 +207,10 @@ class ZebraRfd8500Gateway @Inject constructor(
     private fun startInventoryInternal() {
         if (!inventoryActive.compareAndSet(false, true)) return
         runCatching { reader?.Actions?.Inventory?.perform() }
-            .onFailure { inventoryActive.set(false) }
+            .onFailure {
+                Log.w(TAG, "Inventory.perform failed", it)
+                inventoryActive.set(false)
+            }
     }
 
     // Called by the UI button (non-blocking — result arrives via observeTagScans())
@@ -228,6 +243,7 @@ class ZebraRfd8500Gateway @Inject constructor(
         withContext(Dispatchers.IO) {
             if (locateActive.compareAndSet(true, false)) {
                 runCatching { reader?.Actions?.TagLocationing?.Stop() }
+                    .onFailure { Log.w(TAG, "TagLocationing.Stop failed", it) }
                 proximityFlow.tryEmit(0)
             }
         }
@@ -335,6 +351,7 @@ class ZebraRfd8500Gateway @Inject constructor(
             .coerceAtMost(maxPowerIndex)
 
     private companion object {
+        const val TAG = "QccZebra"
         const val NEARBY_READ_WINDOW_MS = 700L
 
         // Hardware test: index 0 is unreliable; 5 % reads reliably at contact and nothing at ~30 cm

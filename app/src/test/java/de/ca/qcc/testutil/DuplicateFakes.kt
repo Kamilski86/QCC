@@ -6,6 +6,7 @@ import de.ca.qcc.data.export.CsvDocumentWriter
 import de.ca.qcc.data.local.AppDatabase
 import de.ca.qcc.device.zebra.RfidReaderGateway
 import de.ca.qcc.device.zebra.TriggerMode
+import de.ca.qcc.device.zebra.TriggerModeArbiter
 import de.ca.qcc.domain.model.ReaderStatus
 import de.ca.qcc.feature.duplicates.ProximityFeedback
 import kotlinx.coroutines.CompletableDeferred
@@ -53,7 +54,10 @@ class FakeDuplicateReader : RfidReaderGateway {
     override suspend fun disconnect() = Unit
     override suspend fun triggerInventory() = Unit
     override suspend fun setPower(level: Int): Result<Unit> = Result.success(Unit)
+    private val arbiter = TriggerModeArbiter()
     override fun setTriggerMode(mode: TriggerMode) { this.mode = mode }
+    override fun claimTriggerMode(owner: Any, mode: TriggerMode) { this.mode = arbiter.claim(owner, mode) }
+    override fun releaseTriggerMode(owner: Any) { arbiter.release(owner)?.let { this.mode = it } }
     override fun observeHandheldTrigger(): Flow<Boolean> = trigger
     override fun observeProximity(): Flow<Int> = proximity
     override suspend fun startLocate(epc: String, mask: String): Result<Unit> {

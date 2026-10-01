@@ -6,6 +6,26 @@ import kotlinx.coroutines.flow.emptyFlow
 
 enum class TriggerMode { QCC, CAPTURE, LOCATE }
 
+// Only the latest claimant may hand the trigger back to QCC, so a screen that is torn down late
+// (navigation animation, cleared view model) cannot reset the mode of the screen that replaced it
+class TriggerModeArbiter {
+    private var owner: Any? = null
+
+    @Synchronized
+    fun claim(owner: Any, mode: TriggerMode): TriggerMode {
+        this.owner = owner
+        return mode
+    }
+
+    // Returns QCC if `owner` still holds the trigger, null if it was already taken over
+    @Synchronized
+    fun release(owner: Any): TriggerMode? {
+        if (this.owner !== owner) return null
+        this.owner = null
+        return TriggerMode.QCC
+    }
+}
+
 interface RfidReaderGateway {
     fun observeStatus(): Flow<ReaderStatus>
     fun observeTagScans(): Flow<String>
@@ -20,6 +40,10 @@ interface RfidReaderGateway {
 
     // QCC = trigger runs the QCC single-tag scan; other modes only report presses
     fun setTriggerMode(mode: TriggerMode) = Unit
+
+    // Non-QCC screens claim the trigger under their own identity and release it when leaving
+    fun claimTriggerMode(owner: Any, mode: TriggerMode) = setTriggerMode(mode)
+    fun releaseTriggerMode(owner: Any) = setTriggerMode(TriggerMode.QCC)
 
     // true = pressed, false = released; emitted only while mode != QCC
     fun observeHandheldTrigger(): Flow<Boolean> = emptyFlow()

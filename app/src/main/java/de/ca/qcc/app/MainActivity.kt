@@ -143,6 +143,11 @@ private fun AppNav() {
     val exportViewModel: ExportViewModel = hiltViewModel()
     val scanViewModel: ScanViewModel = hiltViewModel()
 
+    // The duplicate finder owns the scanners while it is on screen; QCC must not react to them
+    LaunchedEffect(currentRoute) {
+        scanViewModel.setSuspended(currentRoute == Screen.Duplicates.route)
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = currentRoute != Screen.Splash.route,
