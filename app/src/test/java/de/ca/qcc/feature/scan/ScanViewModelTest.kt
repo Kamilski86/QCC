@@ -3,6 +3,7 @@ package de.ca.qcc.feature.scan
 import android.app.Application
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import de.ca.qcc.core.gs1.Gs1ParserService
 import de.ca.qcc.data.local.AppDatabase
 import de.ca.qcc.data.repository.MismatchRepository
 import de.ca.qcc.device.honeywell.BarcodeScannerGateway
@@ -156,5 +157,40 @@ class ScanViewModelTest {
 
         assertEquals(ComparisonStatus.MATCH, viewModel.uiState.value.comparison.status)
         assertEquals(1, scanCount())
+    }
+
+    // Same GTIN-14 and serial, but the EPC encodes an 8-digit company prefix (partition 4):
+    // the dotted SGTIN strings differ ("40655469.02768.…" vs "4065546.092768.…"), the item is the same
+    @Test
+    fun differentCompanyPrefixLength_stillMatchesOnGtinAndSerial() = runTest {
+        val epc = Gs1ParserService().encodeSgtin96("40655469", "02768", "12884901894", 1)
+
+        barcode.scans.emit(validQr)
+        rfid.tags.emit(epc)
+
+        assertEquals(ComparisonStatus.MATCH, viewModel.uiState.value.comparison.status)
+        assertEquals(1, scanCount())
+        assertEquals(0, mismatchCount())
+    }
+
+    @Test
+    fun sameGtinButDifferentSerial_isMismatch() = runTest {
+        val epc = Gs1ParserService().encodeSgtin96("40655469", "02768", "12884901895", 1)
+
+        barcode.scans.emit(validQr)
+        rfid.tags.emit(epc)
+
+        assertEquals(ComparisonStatus.MISMATCH, viewModel.uiState.value.comparison.status)
+        assertEquals(1, mismatchCount())
+    }
+
+    @Test
+    fun differentGtinSameSerial_isMismatch() = runTest {
+        val epc = Gs1ParserService().encodeSgtin96("4065546", "092769", "12884901894", 1)
+
+        barcode.scans.emit(validQr)
+        rfid.tags.emit(epc)
+
+        assertEquals(ComparisonStatus.MISMATCH, viewModel.uiState.value.comparison.status)
     }
 }

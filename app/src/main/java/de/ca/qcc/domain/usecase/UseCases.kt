@@ -18,7 +18,12 @@ class CompareScansUseCase @Inject constructor(
         val qrNormalized = qr.sgtin?.trim()?.lowercase()
         val rfidNormalized = rfid.sgtin.trim().lowercase()
 
-        val isMatch = qr.serial != null && qrNormalized == rfidNormalized
+        // Compare GTIN-14 + serial, not the dotted SGTIN strings: where the dots fall depends on the
+        // company prefix length, which the QR side has to assume (7 digits) but the EPC encodes
+        val rfidSerial = rfidNormalized.substringAfterLast('.')
+        val isMatch = qr.serial != null &&
+            qr.gtin.trim() == rfid.gtin.trim() &&
+            qr.serial.trim().lowercase() == rfidSerial
 
         mismatchRepository.addScan(
             gtinQr = qr.gtin,
@@ -47,11 +52,7 @@ class CompareScansUseCase @Inject constructor(
 
             ComparisonResult(
                 status = ComparisonStatus.MISMATCH,
-                message = when {
-                    qr.serial == null -> "QR enthält keine Seriennummer"
-                    qrNormalized == null -> "QR-SGTIN konnte nicht aufgebaut werden"
-                    else -> "SGTIN stimmt nicht überein"
-                }
+                message = if (qr.serial == null) "QR enthält keine Seriennummer" else "SGTIN stimmt nicht überein"
             )
         }
     }
