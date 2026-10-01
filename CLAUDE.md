@@ -10,7 +10,7 @@ This is an Android project built with Gradle. All commands run from the repo roo
 # Debug build
 ./gradlew assembleDebug
 
-# Release build
+# Release build (signed if the git-ignored keystore.properties exists, see docs/confluence/10-betrieb-und-release.md §4)
 ./gradlew assembleRelease
 
 # Run all unit tests

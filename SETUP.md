@@ -71,6 +71,9 @@ APK liegt danach unter:
 ./gradlew assembleRelease
 ```
 
+### Signierter Release-Build
+Für ein signiertes Release-APK braucht der Checkout eine **lokale, nicht versionierte** Datei `keystore.properties` im Repo-Stamm (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`) und den Keystore (liegt beim Projektverantwortlichen, **nie committen**). Ohne die Datei baut `./gradlew assembleRelease` ein unsigniertes APK. Details: `docs/confluence/10-betrieb-und-release.md`, Abschnitt 4.
+
 ### Lint-Prüfung
 ```bash
 ./gradlew lint

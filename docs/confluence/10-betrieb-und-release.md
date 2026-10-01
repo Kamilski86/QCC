@@ -21,7 +21,7 @@ Es gibt keine Backend-Systeme; die App ist offline.
 | Variante | Status | Hinweis |
 |---|---|---|
 | `debug` | ✅ baut, läuft auf CT37 | `applicationId de.ca.qcc`, Schemata als Assets (für Tests) |
-| `release` | ✅ baut (seit 2026-10-01), ⏳ unsigniert | R8 mit `proguard-rules.pro` (Vendor-SDKs bleiben unobfuskiert); Ausgabe `app/build/outputs/apk/release/app-release-unsigned.apk` (ca. 12 MB). Start auf dem CT37 geprüft (Dashboard rendert, kein Absturz); **Funktionstest mit Reader/Scan/Export steht aus** |
+| `release` | ✅ baut, ✅ **signiert** (seit 2026-10-01) | R8 mit `proguard-rules.pro`; Ausgabe `app/build/outputs/apk/release/app-release.apk` (ca. 12 MB, Signatur v2 verifiziert). Ohne `keystore.properties` entsteht `app-release-unsigned.apk`. Start auf dem CT37 geprüft; **Funktionstest mit Reader/Scan/Export steht aus** |
 
 **Release-Build-Konfiguration (erledigt 2026-10-01):** Ursache des früheren Fehlers war ein von Zebras SDK referenziertes, nicht öffentliches Android-Klassenobjekt (`android.os.ServiceManager`). `app/proguard-rules.pro` enthält nun
 1. `-dontwarn android.os.ServiceManager`,
@@ -29,7 +29,7 @@ Es gibt keine Backend-Systeme; die App ist offline.
 3. `-dontwarn` für nicht genutzte Zebra-Transporte (`com.jcraft.jsch`, `fi.iki.elonen`, `org.apache.xerces`, `org.bouncycastle`, `org.java_websocket`).
 
 **Noch erforderlich vor Auslieferung:**
-1. **Signierung** einrichten (Keystore außerhalb des Repositories; Release-Signaturen sind an den Paketnamen gebunden, eine Debug-Signatur eignet sich nicht für die Verteilung).
+1. ~~Signierung einrichten~~ – **erledigt**, siehe Abschnitt 4.
 2. **Funktionstest des signierten Release-Builds** auf dem CT37 (Reader verbinden, QCC-Scan, Duplicate Finder, CSV-Export), da Minifizierung Hilt/Room/SDK-Aufrufe beeinflussen kann.
 3. Verteilungsweg festlegen (Seite 13, O-04).
 
@@ -54,7 +54,36 @@ Eine bestehende Installation wird ersetzt, **Daten bleiben erhalten**; die Daten
 ### Deinstallation / Datenverlust
 Deinstallation oder „Daten löschen“ entfernt `qcc.db` und die Einstellungen. Exportierte CSV-Dateien in *Documents* bleiben bestehen.
 
-## 4 Versionierung
+## 4 Signierung des Release-Builds
+
+| Aspekt | Wert |
+|---|---|
+| Keystore | `~/.qcc-signing/qcc-release.jks` (PKCS12, RSA 4096, Alias `qcc`, gültig ca. 27 Jahre), **außerhalb des Repositories** |
+| Zertifikat | `CN=QCC, C=DE`; SHA-256-Fingerabdruck `15:47:C7:96:86:FF:6F:98:0D:27:7B:96:0F:5A:47:84:06:C5:F7:D4:35:33:3E:13:3E:CE:E1:B2:01:E3:A5:28` |
+| Zugangsdaten | `keystore.properties` im Repo-Stamm (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`); **git-ignoriert** (`.gitignore`: `keystore.properties`, `*.jks`, `*.keystore`) |
+| Build-Logik | `app/build.gradle.kts` liest `keystore.properties`; ist die Datei vorhanden, wird `release` signiert, sonst entsteht ein unsigniertes APK (Checkouts ohne Secrets bauen weiter) |
+| Signaturschema | APK Signature Scheme v2 (minSdk 28) |
+
+**Befehle**
+```bash
+./gradlew assembleRelease                                      # → app/build/outputs/apk/release/app-release.apk
+apksigner verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+shasum -a 256 app/build/outputs/apk/release/app-release.apk    # Prüfsumme für Confluence/Verteilung
+```
+
+**Wichtig – Schlüsselverwaltung**
+- Die Signatur ist die **Identität der App**: Updates lassen sich nur installieren, wenn sie mit **demselben** Schlüssel signiert sind. **Geht der Keystore oder das Passwort verloren, kann keine installierte App mehr aktualisiert werden** (nur Deinstallation, dabei gehen die lokalen Daten verloren).
+- **Backup:** Keystore-Datei **und** Passwort (steht in `keystore.properties`) sicher und getrennt vom Repository ablegen (Passwortmanager/Tresor des Unternehmens). Nicht in Confluence, Git oder E-Mail.
+- Das Passwort wurde zufällig erzeugt; für eine Unternehmensumgebung kann der Schlüssel vom Betrieb/Security neu erzeugt werden (dann einmalig neu installieren, da der Schlüssel wechselt).
+- **Debug- und Release-Build haben verschiedene Signaturen:** Ein Release-APK lässt sich **nicht** über eine installierte Debug-App installieren (und umgekehrt) – vorher deinstallieren (Datenverlust) oder auf einem anderen Gerät testen.
+
+### APK exportieren und in Confluence ablegen
+1. `./gradlew assembleRelease`, Prüfsumme bilden, Datei mit Version benennen (z. B. `QCC-0.1.0-release.apk` + `QCC-0.1.0-release.apk.sha256`; lokal in `dist/`, git-ignoriert).
+2. In Confluence als **Seitenanhang** an einer zugriffsbeschränkten Seite hochladen (Dateimakro/Anhänge); Version, Datum, Commit und SHA-256 auf der Seite vermerken.
+3. Erst nach Klärung der SDK-Lizenzen (Seite 13, O-08) breiter verteilen; für den Rollout ist MDM sauberer als der Download aus Confluence.
+4. Installation am Gerät: „Unbekannte Apps installieren“ erlauben oder per MDM/`adb install`.
+
+## 5 Versionierung
 
 | Aspekt | Ist |
 |---|---|
@@ -65,15 +94,15 @@ Deinstallation oder „Daten löschen“ entfernt `qcc.db` und die Einstellungen
 
 **Empfehlung:** Semantische Versionen; `versionCode` bei jedem ausgelieferten Build erhöhen; Git-Tag `vX.Y.Z` pro Release; About-Screen aus `BuildConfig.VERSION_NAME` speisen (`buildConfig = true` ist bereits aktiviert).
 
-## 5 Release-Prozess (Empfehlung)
+## 6 Release-Prozess (Empfehlung)
 
 1. Branch `main` stabil, alle Tests grün (`./gradlew test`).
 2. Version erhöhen, Änderungshistorie (Seite 15) und Release Notes ergänzen.
-3. Release-Build mit R8 erzeugen, signieren, auf CT37 prüfen (Hardware-Abnahme Seite 09, H-01…H-10).
+3. Release-Build mit R8 erzeugen (signiert über `keystore.properties`), auf CT37 prüfen (Hardware-Abnahme Seite 09, H-01…H-10).
 4. Git-Tag setzen, Artefakt archivieren (APK + `mapping.txt`).
 5. Verteilung (MDM/Store/manuell) **[zu bestätigen]**; Anwender informieren (Schulung bei Verhaltensänderung, z. B. Wegfall der Scan-Buttons).
 
-## 6 Release Notes
+## 7 Release Notes
 
 ### Version 0.1.0 (Stand 2026-10-01, Branch `fix/duplicate-finder-ux`, noch nicht in `main` gemergt)
 
@@ -84,7 +113,7 @@ Deinstallation oder „Daten löschen“ entfernt `qcc.db` und die Einstellungen
 - Popups (Dialog mit OK) für Warnungen und Fehler im Duplicate Finder.
 
 **Geändert**
-- **Release-Build** funktioniert (R8-Regeln für die Vendor-SDKs).
+- **Release-Build** funktioniert (R8-Regeln für die Vendor-SDKs) und wird **signiert** (Keystore außerhalb des Repositories).
 - Vergleich über **GTIN-14 + Seriennummer** statt über den Punkt-String (unabhängig von der Company-Prefix-Länge).
 - Reader-Screen: Sendeleistung als „Level n of 30“ mit Hinweistext statt irreführend „dBm“.
 - **Polnische Übersetzung entfernt** (App-Sprachen: EN, DE).
@@ -101,10 +130,10 @@ Deinstallation oder „Daten löschen“ entfernt `qcc.db` und die Einstellungen
 - Zuletzt gelesene TID ging beim Wiederöffnen einer offenen Suche verloren.
 
 **Bekannte Probleme**
-- Release-Build ist unsigniert; Funktionstest des signierten Release-Builds steht aus (siehe Abschnitt 2).
+- Funktionstest des signierten Release-Builds (Reader, Scan, Export) steht aus (siehe Abschnitt 2).
 - Test mit **zwei gleichzeitig gehaltenen Duplikaten** steht aus.
 
-## 7 Betrieb und Support
+## 8 Betrieb und Support
 
 | Thema | Ist / Empfehlung |
 |---|---|

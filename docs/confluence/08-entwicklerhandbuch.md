@@ -52,8 +52,8 @@ Mehrere Geräte: `ANDROID_SERIAL=<seriennummer> ./gradlew installDebug`; Geräte
 |---|---|
 | `./gradlew lintDebug` stürzt ab | „Exception occurred when reading Kotlin metadata“ – auch auf dem Baseline-Commit `499466a`; nicht durch Feature-Arbeit verursacht |
 | Lint-Befunde | 8 alte `MissingTranslation`-Fehler (z. B. `cancel`, `actions`, …) unbehoben |
-| `assembleRelease` | **behoben (2026-10-01)**: `app/proguard-rules.pro` hält `com.zebra.**` und `com.honeywell.**` unobfuskiert (Honeywell bündelt JNI-Bibliotheken) und unterdrückt Warnungen für nicht genutzte Zebra-Transporte (JSch, NanoHTTPD, Xerces, BouncyCastle, WebSocket). Die Datei ist jetzt **Pflichtbestandteil** des Release-Builds. Ergebnis: unsigniertes `app-release-unsigned.apk` (ca. 12 MB) |
-| Keine Signaturkonfiguration | `release` hat kein `signingConfig`; das APK ist **unsigniert** und nicht installierbar, bis signiert wird (Seite 10) |
+| `assembleRelease` | **behoben (2026-10-01)**: `app/proguard-rules.pro` hält `com.zebra.**` und `com.honeywell.**` unobfuskiert (Honeywell bündelt JNI-Bibliotheken) und unterdrückt Warnungen für nicht genutzte Zebra-Transporte (JSch, NanoHTTPD, Xerces, BouncyCastle, WebSocket). Die Datei ist jetzt **Pflichtbestandteil** des Release-Builds. Ergebnis: `app-release.apk` (signiert, ca. 12 MB) bzw. `app-release-unsigned.apk` ohne Keystore |
+| Release-Signierung | konfiguriert (2026-10-01): `app/build.gradle.kts` liest die git-ignorierte `keystore.properties` (Keystore außerhalb des Repos). Ohne diese Datei entsteht ein **unsigniertes** APK. Details und Schlüsselverwaltung: Seite 10, Abschnitt 4 |
 
 ## 4 Projektstruktur
 

@@ -24,10 +24,11 @@ Vertraulichkeit/Integrität/Verfügbarkeit: Schutzbedarf **[zu bestätigen]**. A
 
 | Permission | Zweck | Genutzt? | Bewertung |
 |---|---|---|---|
-| `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT` | Zebra-Reader finden/verbinden (Laufzeit-Anfrage ab Android 12) | ja | erforderlich. **[Beobachtung]** Für Android 9–11 fehlen die Legacy-Berechtigungen (`BLUETOOTH`, `BLUETOOTH_ADMIN`, Standort); Betrieb dort ungeprüft |
+| `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT` | Zebra-Reader finden/verbinden (Laufzeit-Anfrage ab Android 12) | ja | erforderlich (im App-Manifest deklariert) |
 | `VIBRATE` | Haptik | ja | erforderlich |
 | ~~`POST_NOTIFICATIONS`~~ | – | – | **entfernt am 2026-10-01** (war ungenutzt) |
 | ~~`FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_CONNECTED_DEVICE`~~ | – | – | **entfernt am 2026-10-01** (war ungenutzt) |
+| `BLUETOOTH`, `BLUETOOTH_ADMIN`, `ACCESS_COARSE_LOCATION`, `ACCESS_FINE_LOCATION`, `READ_EXTERNAL_STORAGE`, `com.honeywell.decode.permission.DECODE` | **nicht im App-Manifest**, sondern vom Manifest-Merge aus den **Vendor-SDKs** (Zebra/Honeywell) übernommen; sichtbar im fertigen APK (`aapt2 dump permissions`) | teils | **[Beobachtung]** Das APK fordert damit auch **Standort** und **Lesezugriff auf Speicher** an, obwohl die App beides selbst nicht benötigt. Die App fragt Standort/Speicher zur Laufzeit **nicht** ab (Laufzeit-Anfrage nur für Bluetooth ab Android 12). **[Empfehlung]** Per `tools:node="remove"` im App-Manifest entfernen, nachdem getestet wurde, dass die SDKs ohne sie funktionieren (auf Android 9–11 sind Standort-Rechte für die Bluetooth-Suche üblicherweise nötig) |
 | `INTERNET` | – | nicht deklariert | App ist offline (gewollt); wird für EPCIS (geplant) nötig |
 | Speicher (`WRITE_EXTERNAL_STORAGE`) | CSV auf API 28 | nicht deklariert | MediaStore ab API 29 ohne Berechtigung; API 28 würde scheitern |
 
@@ -69,7 +70,8 @@ Vertraulichkeit/Integrität/Verfügbarkeit: Schutzbedarf **[zu bestätigen]**. A
 | S-03 | CSV-Injection beim Öffnen exportierter Dateien | niedrig | niedrig–mittel | Formelzeichen am Feldanfang neutralisieren, falls Dritte QR-Inhalte beeinflussen können |
 | S-04 | Manipulierte/ersetzte Vendor-AARs | niedrig | hoch | Prüfsummen dokumentieren, Bezug aus offiziellen Quellen belegen |
 | S-05 | Unbegrenzte Aufbewahrung von Betriebsdaten | mittel | niedrig–mittel | Aufbewahrungs-/Löschkonzept |
-| S-06 | Betrieb auf Android 9–11 ungeprüft (Legacy-Bluetooth-Rechte) | niedrig | mittel | Zielgeräte-Matrix festlegen; sonst `minSdk` anheben |
+| S-06 | Betrieb auf Android 9–11 ungeprüft: die Legacy-/Standort-Berechtigungen stehen zwar im APK (aus den SDKs), die App fragt sie dort aber nicht zur Laufzeit ab | niedrig | mittel | Zielgeräte-Matrix festlegen; sonst `minSdk` anheben oder Laufzeit-Abfrage ergänzen |
+| S-07 | Release-Keystore geht verloren oder wird offengelegt | niedrig | hoch | Backup von Keystore **und** Passwort getrennt vom Repository (Passwortmanager); bei Verlust können installierte Apps nicht mehr aktualisiert werden, bei Offenlegung kann Dritten ein gültig signiertes APK gelingen (siehe Seite 10, Abschnitt 4) |
 
 ## 8 Offene Fragen für Security/Datenschutz
 

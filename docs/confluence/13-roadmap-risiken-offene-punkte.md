@@ -29,7 +29,7 @@
 
 | # | Vorschlag | Nutzen |
 |---|---|---|
-| V-1 | ~~R8-Regeln für Vendor-SDKs, Release-Build prüfen~~ **erledigt (2026-10-01)**; offen: **Signierung** und Funktionstest des signierten Release-Builds | Auslieferbarkeit |
+| V-1 | ~~R8-Regeln, Release-Build, Signierung~~ **erledigt (2026-10-01)**; offen: Funktionstest des signierten Release-Builds mit Reader, Scan und Export | Auslieferbarkeit |
 | V-2 | ~~Bedienelement oder Anzeige der Sendeleistung~~ **entschieden (2026-10-01): Anzeige bleibt, Label korrigiert („Level n of 30“ + Hinweistext), kein Bedienelement** | erledigt (FR-09) |
 | V-3 | ~~Entscheidung zur manuellen GTIN~~ **entschieden: entfernt (2026-10-01)** | FR-02 |
 | V-4 | ~~Polnisch in die Sprachauswahl~~ **Polnisch entfernt (2026-10-01)**; offen: QCC-Klartexte lokalisieren | NFR-05 |
@@ -38,6 +38,7 @@
 | V-7 | ~~Unbenutzte Permissions/Strings/Routen entfernen~~ **erledigt (2026-10-01)** | Aufräumen (Seite 11) |
 | V-8 | Backup-/Aufbewahrungskonzept | Datenschutz |
 | V-9 | CI mit Unit-Tests (ohne Hardware) | Qualität |
+| V-11 | Berechtigungen aus den SDKs (Standort, Speicher) per `tools:node="remove"` entfernen und testen | Angriffsfläche (Seite 11) |
 | V-10 | Test mit zwei gleichzeitigen Duplikaten (H-04) | Absicherung FR-16 |
 
 ## 2 Technische Schulden
@@ -68,11 +69,11 @@
 | R-01 | Hardwareabhängigkeit begrenzt Testautomatisierung | hoch | mittel | Fakes; Hardware-Smoke-Protokoll |
 | R-02 | Lokale Vendor-AARs: Reproduzierbarkeit, Lizenz, Größe | mittel | mittel | Prüfsummen, Lizenzklärung (Seite 11) |
 | R-03 | NavHost-weite ViewModels erzeugen Seiteneffekte bei neuen Features | mittel | mittel | `setSuspended` als Übergang; Umbau (RM-2) |
-| R-04 | ~~Release-Build nicht baubar~~ **behoben (2026-10-01)**; Restrisiko: Funktionstest des signierten Release-Builds (Minifizierung) steht aus | – | – | V-1 |
+| R-04 | ~~Release-Build nicht baubar~~ **behoben (2026-10-01)**, signiert; Restrisiko: Funktionstest des signierten Release-Builds (Minifizierung) steht aus | – | – | V-1 |
 | R-05 | Nahbereichs-Leistung (5 %) am Einzelfall kalibriert; Metall/Flüssigkeit/andere Tags | mittel | mittel | Hardware-Tests mit weiteren Artikeln; Leistung ggf. konfigurierbar machen |
 | R-06 | Mehrere gleichzeitige Duplikate nicht an Hardware verifiziert | mittel | mittel | H-04 durchführen |
 | R-07 | Falsche Gerätezeit verfälscht Tageszähler/CSV | niedrig | mittel | Zeitsynchronisation per MDM |
-| R-08 | Android 9–11 ungeprüft (Legacy-Bluetooth-Rechte; Export auf API 28) | niedrig | mittel | Zielgeräte-Matrix, ggf. `minSdk` anheben |
+| R-08 | Android 9–11 ungeprüft (Standort-/Legacy-Bluetooth-Rechte stammen aus den SDKs und werden nicht zur Laufzeit abgefragt; Export auf API 28) | niedrig | mittel | Zielgeräte-Matrix, ggf. `minSdk` anheben |
 | R-09 | ~~QR→SGTIN geht von 7-stelligem Company Prefix aus~~ **entschärft (2026-10-01, ADR-19)**: Vergleich über GTIN + Seriennummer; Restrisiko nur in der Anzeige „QR SGTIN“ | – | – | erledigt |
 | R-10 | Unbegrenzte Datenhaltung, Backup nicht gesteuert | mittel | niedrig–mittel | V-8 |
 | R-11 | Prozessänderung ohne Schulung (Wegfall der Scan-Buttons, Dialoge bei Warnungen) | mittel | niedrig | Kurzanleitung (Seite 04), Einweisung |
