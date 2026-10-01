@@ -133,13 +133,12 @@ Splash → Dashboard
 
 ## Lokalisierung
 
-Die App unterstützt drei Sprachen:
+Die App unterstützt zwei Sprachen:
 
 | Ordner | Sprache |
 |--------|---------|
 | `res/values/` | Englisch (Standard) |
 | `res/values-de/` | Deutsch |
-| `res/values-pl/` | Polnisch |
 
 ---
 

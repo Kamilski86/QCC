@@ -140,12 +140,11 @@ rfidReader.observeTagScans().onEach { epc ->
 
 ## Localization
 
-Three locale variants maintained in parallel:
+Two locale variants maintained in parallel:
 - `values/` — English (EN)
 - `values-de/` — German (DE)
-- `values-pl/` — Polish (PL)
 
-**All user-visible strings must be added to all three files.** No exceptions.
+**All user-visible strings must be added to both files.** No exceptions.
 
 ---
 
@@ -162,7 +161,7 @@ Three locale variants maintained in parallel:
 - `MutableSharedFlow<T>` for event streams (hardware results, no initial value)
 
 ### Error Handling
-Error messages are user-readable English/German/Polish. Parse errors in `Gs1ParserService` throw `IllegalArgumentException` with message keys (translated in callers). Hardware errors are logged and UI shows status.
+Error messages are user-readable English/German. Parse errors in `Gs1ParserService` throw `IllegalArgumentException` with message keys (translated in callers). Hardware errors are logged and UI shows status.
 
 ---
 

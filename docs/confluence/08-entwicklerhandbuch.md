@@ -72,7 +72,7 @@ Siehe [05 Architektur](05-architektur.md), Abschnitt „Paketstruktur“. Wichti
 ## 5 Konventionen
 
 - **Architektur:** keine direkte SDK-Nutzung im UI-Layer; immer über Gateways. Neue Hardware-Funktionen erst im Interface (mit Default-Implementierung), dann im Gateway, dann im Fake.
-- **Strings:** jede sichtbare Zeichenkette in `values/` (EN), `values-de/`, `values-pl/` anlegen; keine Klartexte in Composables. Der Duplicate Finder liefert **typisierte** Meldungen (`DuplicateMessage`), die UI übersetzt.
+- **Strings:** jede sichtbare Zeichenkette in `values/` (EN) und `values-de/` anlegen; keine Klartexte in Composables. Der Duplicate Finder liefert **typisierte** Meldungen (`DuplicateMessage`), die UI übersetzt.
 - **Datenbank:** Schemaänderung nur mit Versionserhöhung, Migration, Registrierung in `AppModule`, committetem Schema-JSON und `MigrationTest`.
 - **Parser:** QR/EPC immer über `Gs1ParserService` (pure Kotlin, ohne Android-Abhängigkeit).
 - **Ereignisse:** Hardware-Ergebnisse als `SharedFlow` mit `tryEmit`; Zustand als `StateFlow`.
@@ -88,7 +88,7 @@ Siehe [05 Architektur](05-architektur.md), Abschnitt „Paketstruktur“. Wichti
 2. Route in `navigation/Nav.kt` (`Screen`) ergänzen.
 3. In `MainActivity.AppNav` ein `composable(Screen.<Name>.route)` ergänzen; ViewModel **dort** per `hiltViewModel()` erzeugen.
 4. Falls der Trigger/Reader anders genutzt wird: `claim/releaseTriggerMode`, Lifecycle-Observer wie beim Duplicate Finder, `ScanViewModel.setSuspended` für die Route setzen.
-5. Strings in drei Sprachen, Tests (ViewModel mit Fake-Gateway), Doku (Seiten 02–04, 09).
+5. Strings in EN/DE, Tests (ViewModel mit Fake-Gateway), Doku (Seiten 02–04, 09).
 
 ### 6.2 Neue Regel im Vergleich
 Regel im `CompareScansUseCase` oder Parser verorten, Negativtest ergänzen, Seite 03 (Anforderung/AC) und 09 aktualisieren.
@@ -124,5 +124,5 @@ Das Projekt wird mit KI-Agenten (Claude Code) entwickelt. Leitplanken: `CLAUDE.m
 
 - Code kompiliert, `./gradlew test` grün, keine neuen Lint-Befunde.
 - Fachregeln stimmen mit Anforderungen/AC überein; Hardware-Pfade auf CT37 + RFD8500 geprüft.
-- Strings in drei Sprachen; Migration + Schema-JSON bei DB-Änderung.
+- Strings in EN/DE; Migration + Schema-JSON bei DB-Änderung.
 - Doku (`docs/confluence/`) aktualisiert – mindestens Seiten 03 (Anforderungen), 09 (Test), 15 (Änderungshistorie) und je nach Änderung 04/05/06/07.

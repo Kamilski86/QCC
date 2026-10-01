@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Stand** | 2026-10-01 |
-| **Testbestand** | **96 Tests**, alle grün (`./gradlew :app:testDebugUnitTest`) |
+| **Testbestand** | **99 Tests**, alle grün (`./gradlew :app:testDebugUnitTest`) |
 | **Quellen** | `app/src/test/`, Anforderungen (Seite 03) |
 
 ## 1 Teststrategie
@@ -26,13 +26,13 @@ Nicht automatisiert getestet: `ZebraRfd8500Gateway`, `HoneywellCt37ScannerGatewa
 | `core/gs1/Gs1ParserServiceTest` | 1 | Parser-Grundfall |
 | `core/gs1/Gs1ParserServiceTest2` | 4 | EPC/QR-Parsing, Negativfälle |
 | `core/gs1/Gs1LocateTargetTest` | 17 | SGTIN→EPC (Filter 0–7, Partitionen, Rundlauf), Eingabeerkennung, Validierung |
-| `feature/scan/ScanViewModelTest` | 5 | Reihenfolgefreiheit, Zyklus-Clearing (Hardware-Pfad), Persistenz Match/Mismatch, ungültiger EPC, **Suspendierung** |
+| `feature/scan/ScanViewModelTest` | 8 | Reihenfolgefreiheit, Zyklus-Clearing (Hardware-Pfad), Persistenz Match/Mismatch, ungültiger EPC, **Suspendierung**, **Vergleich unabhängig von der Company-Prefix-Länge** (Match bei 8-stelligem Präfix, Mismatch bei anderer Serial/GTIN) |
 | `feature/duplicates/DuplicateSearchViewModelTest` | 43 | Phasen, Live-Auswertung, Start ohne Apply, Trigger-Modi, Ortung, Continuous, Confirm (0/1/n/bekannt/Wiederfund), Dialog-Logik, Trigger-Besitz, Fortsetzen offener Suche, Export, Fehlerpfade |
 | `feature/duplicates/BeepIntervalTest` | 5 | Beep-Kennlinie 1000→80 ms |
 | `feature/duplicates/DuplicateSearchScreenLayoutTest` | 3 | alle Elemente sichtbar ohne Scrollen (360×600 dp), Gauge ≥ 80 dp, TID-Platzhalter „-“ |
 | `data/repository/DuplicateSearchRepositoryTest` | 15 | Nummerierung, Wiederfund + Vorfund-Datum, doppelte TID, offene Suche, `lastTid`, CSV (Inhalt, Escape, „Previously Found“), idempotenter Abschluss, Retry nach Exportfehler |
 | `data/local/MigrationTest` | 3 | 6→7 (Daten bleiben), 7→8 (Constraints, `previousFoundAt`), Cascade |
-| **Summe** | **96** | |
+| **Summe** | **99** | |
 
 Test-Fakes: `FakeDuplicateReader` (inkl. Arbiter-Semantik), `FakeCsvWriter`, `FakeProximityFeedback`, `inMemoryDb`.
 
@@ -42,7 +42,7 @@ Test-Fakes: `FakeDuplicateReader` (inkl. Arbiter-Semantik), `FakeCsvWriter`, `Fa
 |---|---|
 | FR-01, FR-03 | `Gs1ParserServiceTest*`, `Gs1LocateTargetTest` |
 | FR-02 | entfallen (manuelle GTIN entfernt) |
-| FR-04, FR-05, FR-06 | `ScanViewModelTest` |
+| FR-04, FR-05, FR-06 | `ScanViewModelTest` (inkl. AC-11) |
 | FR-07, FR-08 | keine Automatisierung (manuell: Dashboard-Zähler, CSV) |
 | FR-09 | manuell |
 | FR-10, FR-11 | `DuplicateSearchViewModelTest`, `Gs1LocateTargetTest` |

@@ -85,6 +85,9 @@ Deinstallation oder „Daten löschen“ entfernt `qcc.db` und die Einstellungen
 
 **Geändert**
 - **Release-Build** funktioniert (R8-Regeln für die Vendor-SDKs).
+- Vergleich über **GTIN-14 + Seriennummer** statt über den Punkt-String (unabhängig von der Company-Prefix-Länge).
+- Reader-Screen: Sendeleistung als „Level n of 30“ mit Hinweistext statt irreführend „dBm“.
+- **Polnische Übersetzung entfernt** (App-Sprachen: EN, DE).
 - Manuelle GTIN-Eingabe (ohne UI) sowie 24 ungenutzte Strings, die Permissions `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_CONNECTED_DEVICE` und die Routen `scan`/`export` entfernt.
 - Dashboard: Buttons „QR Scan“ und „RFID Scan“ entfallen (Scan nur per Pistolen-Trigger). „Reset“ und „Export Mismatches (CSV)“ bleiben.
 - Duplicate Finder, Phase 1: „Apply“ und „Read with reader“ entfallen (Eingabe wird direkt ausgewertet; Trigger liest an).
@@ -100,7 +103,6 @@ Deinstallation oder „Daten löschen“ entfernt `qcc.db` und die Einstellungen
 **Bekannte Probleme**
 - Release-Build ist unsigniert; Funktionstest des signierten Release-Builds steht aus (siehe Abschnitt 2).
 - Test mit **zwei gleichzeitig gehaltenen Duplikaten** steht aus.
-- Sendeleistung im Reader-Screen nur angezeigt („dBm“-Beschriftung irreführend); Polnisch nicht in der Sprachauswahl (Seite 13).
 
 ## 7 Betrieb und Support
 

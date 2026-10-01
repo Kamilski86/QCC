@@ -81,7 +81,7 @@ Room DB (`qcc.db`) is currently at schema version 8. Four tables: `scans` (every
 
 ### String localization
 
-Three locale variants: `values/` (EN), `values-de/` (DE), `values-pl/` (PL). All user-visible strings must be added to all three files. The app default language is English (`values/`). The duplicate finder adds `dup_*` keys in EN/DE/PL; its ViewModel returns typed messages (`DuplicateMessage`) that the UI localizes.
+Two locale variants: `values/` (EN), `values-de/` (DE) (the Polish translation was removed on 2026-10-01). All user-visible strings must be added to both files. The app default language is English (`values/`). The duplicate finder adds `dup_*` keys in EN/DE; its ViewModel returns typed messages (`DuplicateMessage`) that the UI localizes.
 
 ## Workflow Orchestration
 

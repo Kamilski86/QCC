@@ -94,5 +94,5 @@ QCC reduziert Fehlzuordnungen zwischen physischem RFID-Tag und gedruckter Kennze
 - Betrieb ausschließlich mit **Honeywell CT37 + Zebra RFD8500**; es gibt kein Emulator-Ziel.
 - Die RFD8500 liefert die Trigger-Ereignisse (Pistolengriff); ohne verbundenen Reader funktioniert der Hauptprozess nicht (daher entfielen die manuellen Scan-Buttons im Dashboard).
 - Die App ist **offline**; alle Daten liegen lokal auf dem Gerät.
-- Für den QR→SGTIN-Aufbau wird ein **7-stelliger GS1 Company Prefix** angenommen (`Gs1ParserService.qrCompanyPrefixDigits`). Für andere Präfixlängen wäre der Vergleich unzutreffend (Risiko R-09, Seite 13).
+- Das Unternehmen nutzt derzeit einen **7-stelligen GS1 Company Prefix**. Der Vergleich ist davon unabhängig (GTIN-14 + Seriennummer); nur die angezeigte „QR SGTIN“ unterstellt 7 Stellen für die Punktsetzung.
 - Echter Duplikat-EPC aus dem Test: `3034F8242800C10300000011` (Filterwert 1, Partition 5).

@@ -17,10 +17,10 @@
 | F-06 | Tageszähler | „Scans today“, „Mismatches today“ (Live) | umgesetzt |
 | F-07 | CSV-Export | Export aller Scans nach `Documents/scans_<Zeitstempel>.csv` | umgesetzt |
 | F-08 | Reader-Verwaltung | Auto-Connect beim Start, „Connect“ (Reconnect), Statusanzeige | umgesetzt |
-| F-09 | Sendeleistung | interner Pegel 1–30 → Zebra-Leistungsindex; **keine Bedienung in der UI** (nur Anzeige, Standard 1) | teilweise |
+| F-09 | Sendeleistung | interner Pegel 1–30 → Zebra-Leistungsindex; im Reader-Screen **nur Anzeige** („Level 1 of 30“ mit Hinweis, Standard 1 = Minimum); kein Bedienelement (bewusst) | umgesetzt (Anzeige) |
 | F-10 | Manuelle GTIN | **entfernt** (hatte keinen UI-Einstieg; Code und Strings 2026-10-01 gelöscht) | entfallen |
 | F-11 | Duplikatsuche | Zielvorgabe, Ortung, Confirm find, End search, CSV | umgesetzt |
-| F-12 | Sprachauswahl | EN / DE (PL-Ressourcen vorhanden, aber nicht in der Auswahl) | teilweise |
+| F-12 | Sprachauswahl | EN / DE | umgesetzt |
 | F-13 | About | App-Name und Version | umgesetzt |
 
 ## 2 Bildschirme und Navigation

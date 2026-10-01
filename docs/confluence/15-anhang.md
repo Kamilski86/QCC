@@ -15,6 +15,7 @@
 | 2026-09-30 | **Duplicate Finder** (Branch `feature/duplicate-finder`): GS1-Locate-Ziele und SGTIN-96-Encoding, Trigger-Modi/Ortung/Nahbereichs-Lesen im Zebra-Gateway (Hardware-Spike, Leistung/TID-Länge), DB Schema 7, Repository + CSV-Writer, Proximity-Feedback, ViewModel, Screen + Gauge, Drawer-Eintrag, EN/DE/PL-Strings, Härtungen (Locate-Serialisierung, ToneGenerator, Idempotenz), Dokumentation | `bd0ea0d` … `ce8daa4` |
 | 2026-10-01 | **UX-/Stabilitätsfolgearbeit** (Branch `fix/duplicate-finder-ux`): Trigger-Besitz und QCC-Isolation (`1e9a613`); Wiederfunde mit Datum, Dialoge, Schema 8 (`fcfc3ca`); Dashboard-Button, Ein-Bildschirm-Suchmaske, Maske 1 ohne Apply/Capture, Dialoge für alle Warnungen (`6858e3c`); `CLAUDE.md` aktualisiert (`88d0b55`); **Dokumentation neu** (`docs/confluence/`) | `1e9a613`, `fcfc3ca`, `6858e3c`, `88d0b55`, `38dd09e` |
 | 2026-10-01 | **Aufräumen und Release-Build**: manuelle GTIN, 24 ungenutzte Strings, drei ungenutzte Permissions und zwei ungenutzte Routen entfernt (`f36854b`); R8-Regeln für die Vendor-SDKs, Release-Build läuft (`af94d09`) | `f36854b`, `af94d09` |
+| 2026-10-01 | **Vergleich über GTIN + Seriennummer** (Company-Prefix-unabhängig), **Leistungsanzeige** „Level n of 30“, **Polnisch entfernt** (siehe Seiten 03, 10, 12, 13) | folgt |
 
 Stand der Branches: `main` enthält noch **nicht** die Duplicate-Finder-Arbeit; `fix/duplicate-finder-ux` ist auf `feature/duplicate-finder` aufgebaut (rund 30 Commits vor `main`). Merge und Push stehen aus (Seite 13, O-15).
 

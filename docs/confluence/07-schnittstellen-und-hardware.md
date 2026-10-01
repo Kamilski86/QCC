@@ -121,7 +121,7 @@ Verletzungen liefern „Reader beschäftigt“. `setTriggerMode(QCC)` stoppt ein
 | Funktion | Eingabe → Ausgabe | Regeln / Fehler |
 |---|---|---|
 | `parseQr(raw)` | String → `QrScanResult` | Regex `.*/01/(\d{14})/21/([^/]+).*`; sonst „QR-Code enthält keine erwartete GTIN/Seriennummer-Struktur“ |
-| `buildQrSgtin(gtin, serial)` | → `GCP.ItemRef.Serial` | GTIN 14-stellig; Serial nicht leer; **GCP = 7 Stellen fest** (Stellen 2–8 der GTIN), ItemRef = Indikator + Stellen 9–13; Prüfziffer entfällt |
+| `buildQrSgtin(gtin, serial)` | → `GCP.ItemRef.Serial` | GTIN 14-stellig; Serial nicht leer; **GCP = 7 Stellen fest** (Stellen 2–8 der GTIN), ItemRef = Indikator + Stellen 9–13; Prüfziffer entfällt. **Nur für Anzeige und Persistenz** (`sgtinQr`); der Vergleich nutzt diesen String nicht mehr |
 | `parseEpcToSgtin(epc)` | 24 Hex → `RfidScanResult` | nur Hex; gerade Länge; genau 24 Zeichen; Header `0x30`; Partition 0–6; GTIN ≠ 0…0; Serial ≠ `0000000000`; Prüfziffer wird berechnet (Gewichte 3/1) |
 | `parseLocateTarget(input, filter)` | EPC (24 Hex) **oder** `Ziffern.Ziffern.Ziffern` → `LocateTarget` | sonst „Eingabe ist weder EPC (24 Hex) noch SGTIN“; ein Hex-EPC trägt seinen Filter selbst |
 | `encodeSgtin96(gcp, itemRef, serial, filter)` | → 24 Hex | GCP 6–12 Stellen; ItemRef-Länge passend zur Partition; Filter 0–7; Serial ohne führende Null (außer `0`) und < 2³⁸ |
@@ -136,7 +136,7 @@ Verletzungen liefern „Reader beschäftigt“. `setTriggerMode(QCC)` stoppt ein
 | EPC (Filter 1, Partition 5) | `3034F824285A980300000006`: Header `30`, Filter `001`, Partition `101`, GCP-Bits für `4065546`, ItemRef-Bits für `092768`, Serial 12884901894 = `0x300000006` |
 | EPC (Filter 0) | `3014F824285A980300000006` – **derselbe** SGTIN, daher `MATCH` im QCC-Vergleich (der Filterwert fließt nicht ein) |
 
-> Der QCC-Vergleich vergleicht SGTIN-Strings, **nicht** EPC-Bits; der Filterwert ist daher für den Vergleich ohne Bedeutung, für die **Ortung/TID-Prüfung** (exakte EPC-Maske) aber entscheidend.
+> Der QCC-Vergleich vergleicht **GTIN-14 und Seriennummer** (`qr.gtin == rfid.gtin` und gleiche Seriennummer), **nicht** EPC-Bits und nicht den Punkt-String; weder Filterwert noch Länge des Company Prefix beeinflussen ihn. Für die **Ortung/TID-Prüfung** (exakte EPC-Maske) ist der Filterwert dagegen entscheidend.
 
 ## 6 Interne Ereignisströme
 

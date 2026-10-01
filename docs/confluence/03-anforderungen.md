@@ -46,7 +46,7 @@ Die manuelle Eingabe einer 14-stelligen GTIN (ohne Seriennummer, Vergleich immer
 
 ### FR-04 Vergleichslogik (Must) ✅
 - Vorbedingung: QR- und RFID-Wert liegen vor.
-- Vergleich der **normalisierten** SGTINs (`trim` + `lowercase`); QR ohne Seriennummer → `MISMATCH`.
+- Vergleich über **GTIN-14 und Seriennummer** (GTIN gleich **und** Seriennummer gleich nach `trim` + `lowercase`); unabhängig von der Länge des Company Prefix (seit 2026-10-01). QR ohne Seriennummer → `MISMATCH`.
 - Nebenwirkung: **jeder** Vergleich → eine Zeile in `scans`; bei `MISMATCH` zusätzlich eine Zeile in `mismatches`.
 - **Trace:** `CompareScansUseCase.invoke`, `MismatchRepository.addScan/add`.
 
@@ -64,9 +64,9 @@ Vor einem neuen Wert nach abgeschlossenem Zyklus (QR+RFID vorhanden oder Ergebni
 - **Hinweis:** Der Button heißt „Export Mismatches (CSV)“, exportiert aber die komplette Scan-Historie (Bezeichnung weicht ab, Seite 13).
 - **Trace:** `MismatchRepository.exportPendingCsv`, `MediaStoreCsvDocumentWriter`.
 
-### FR-09 Reader-Betrieb (Should) 🟡
+### FR-09 Reader-Betrieb (Should) ✅
 - ✅ Auto-Discovery und Verbindung zum ersten gefundenen Reader beim Start (`ScanViewModel.init`); „Connect“ im Reader-Screen für Reconnect; Statustext.
-- 🟡 Sendeleistung: Mapping Pegel 1–30 → Leistungsindex vorhanden, Standard 1 (= Index 0, Minimum); **kein Bedienelement** zum Ändern – `ReaderConfigScreen` zeigt den Wert nur an („… dBm“, tatsächlich ein Pegel, keine dBm-Angabe).
+- ✅ Sendeleistung: Mapping Pegel 1–30 → Leistungsindex, Standard 1 (= Index 0, Minimum – bewusst niedrig, damit nur Tags direkt an der Pistole gelesen werden). Der Reader-Screen **zeigt** den Wert („Level 1 of 30“) mit Empfehlungstext an; ein Bedienelement ist **bewusst nicht** vorgesehen (Entscheidung 2026-10-01; früher irreführend als „dBm“ beschriftet).
 - **Trace:** `ZebraRfd8500Gateway.discoverReaders/connect/setPower`.
 
 ## 3 Funktionale Anforderungen – Duplikatsuche
@@ -140,7 +140,7 @@ Button **„Find duplicates“** im Dashboard (unter „Export Mismatches (CSV)�
 | NFR-02 | Architektur MVVM, Hilt, Room, Navigation Compose | Strukturreview, Seite 05 | ✅ |
 | NFR-03 | Rückmeldung (Ton/Vibration) unmittelbar nach Scan | manueller Test auf Hardware | 🧪 |
 | NFR-04 | Parse-/Verbindungsfehler als benutzerlesbare Meldung | Negativtests Parser/ViewModel | ✅ (QCC-Meldungen teils deutsch hart codiert) |
-| NFR-05 | UI-Texte in `values`, `values-de`, `values-pl` | Resource-Review | 🟡 (QCC-ViewModel/UseCase-Meldungen und Reader-Status deutsch hart codiert; in DE/PL fehlen `match`, `mismatch`, `ok`) |
+| NFR-05 | UI-Texte in `values` (EN) und `values-de` (DE) | Resource-Review | 🟡 (QCC-ViewModel/UseCase-Meldungen und Reader-Status deutsch hart codiert) |
 | NFR-06 | Robuste lokale Persistenz inkl. verlustfreier Migration (Schema 8) | `MigrationTest` (6→7, 7→8), Repository-Tests | ✅ |
 | NFR-07 | Suchmaske des Duplicate Finders ohne Scrollen auf Handheld-Display | `DuplicateSearchScreenLayoutTest` (360×600 dp, Gauge ≥ 80 dp); Anwender-Abnahme CT37 | ✅🧪 |
 | NFR-08 | Offline-Betrieb (kein Netzwerkzugriff) | Manifest ohne `INTERNET` | ✅ |
@@ -240,6 +240,11 @@ AC-09 Isolation
   When ich den Pistolen-Trigger drücke
   Then läuft der QCC-Scan wie zuvor, und es läuft keine Ortung weiter
 
+AC-11 Company-Prefix-Länge
+  Given QR und RFID-Tag tragen dieselbe GTIN-14 und Seriennummer
+  When der EPC einen 8-stelligen Company Prefix codiert (andere Partition)
+  Then ist das Ergebnis MATCH
+
 AC-10 Eine Bildschirmseite
   Given die Suchphase auf einem 360x600dp-Display
   Then sind alle Karten und beide Buttons ohne Scrollen sichtbar
@@ -264,7 +269,7 @@ AC-10 Eine Bildschirmseite
 |---|---|
 | DB-Schema v6, zwei Tabellen | Schema **8**, vier Tabellen |
 | Dashboard mit Buttons „QR Scan“, „RFID Scan“ | entfernt; Scan nur per Trigger; neu: „Find duplicates“ |
-| FR-09 „Sendeleistung kann angepasst werden“ | nur Anzeige, kein Bedienelement |
+| FR-09 „Sendeleistung kann angepasst werden“ | nur Anzeige (bewusst), kein Bedienelement |
 | Drawer: Scan, Export, Reader, Language, About | Dashboard, Find duplicates, Reader, Language, About |
 | Manuelle GTIN-Eingabe (FR-02) | entfernt (2026-10-01) |
 | QCC-Ziel „kein Scan ohne Hardware“ | unverändert; zusätzlich Isolation zwischen Use Cases (FR-21) |

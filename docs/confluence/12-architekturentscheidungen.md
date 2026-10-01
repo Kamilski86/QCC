@@ -25,7 +25,8 @@
 | ADR-15 | Ton/Vibration über das CT37 | Aktiv |
 | ADR-16 | CSV-Export über MediaStore in *Documents* | Aktiv |
 | ADR-17 | Vendor-SDKs als lokale AARs | Aktiv, Schuld |
-| ADR-18 | Englisch als Standardsprache, drei Ressourcen-Sets | Aktiv |
+| ADR-18 | Englisch als Standardsprache, zwei Ressourcen-Sets (EN, DE) | Aktiv |
+| ADR-19 | QCC-Vergleich über GTIN-14 + Seriennummer | Aktiv |
 
 ---
 
@@ -51,7 +52,7 @@
 
 ### ADR-05 GS1-Parsing als pure-Kotlin-Service
 - **Entscheidung:** `Gs1ParserService` ohne Android-Abhängigkeiten.
-- **Konsequenzen:** schnell testbar (JVM); Annahme „7-stelliger Company Prefix“ für den QR→SGTIN-Aufbau ist fest verdrahtet (Risiko R-09).
+- **Konsequenzen:** schnell testbar (JVM); der QR→SGTIN-Aufbau nimmt einen 7-stelligen Company Prefix an – nur noch für Anzeige/Persistenz relevant (siehe ADR-19).
 
 ### ADR-06 Room mit Schemaexport und Migrationen
 - **Kontext:** Daten sind Audit-Grundlage und dürfen bei Updates nicht verloren gehen.
@@ -110,5 +111,10 @@
 - **Konsequenzen:** reproduzierbar ohne Download, aber große Binärdateien im Repo, kein Prüfsummen-Nachweis, **R8-Konflikt im Release** (Seite 10).
 
 ### ADR-18 Sprachen
-- **Entscheidung:** Englisch als Standard (`values/`), zusätzlich `values-de`, `values-pl`; Sprachwahl über `AppCompatDelegate.setApplicationLocales`.
-- **Konsequenzen:** Polnisch ist nicht in der Auswahl; QCC-Klartexte teils noch deutsch (Seite 13).
+- **Entscheidung:** Englisch als Standard (`values/`), zusätzlich `values-de`; Sprachwahl über `AppCompatDelegate.setApplicationLocales`. Die polnische Übersetzung wurde am 2026-10-01 entfernt (sie war nicht wählbar).
+- **Konsequenzen:** zwei Ressourcen-Sets; QCC-Klartexte teils noch deutsch (Seite 13).
+
+### ADR-19 QCC-Vergleich über GTIN-14 + Seriennummer
+- **Kontext:** Der QCC-Vergleich verglich den Punkt-String `GCP.ItemRef.Serial`. Die QR-Seite muss dafür die Länge des Company Prefix **annehmen** (7 Stellen), die EPC-Seite liest sie aus der Partition. Bei einem anderen Präfix hätten gleiche Artikel unterschiedliche Strings ergeben (falscher Mismatch). Das Unternehmen nutzt derzeit 7 Stellen.
+- **Entscheidung:** Match = `qr.gtin == rfid.gtin` **und** gleiche Seriennummer (`trim`, `lowercase`). Beide Seiten liefern die GTIN-14 unabhängig von der Präfixlänge (EPC-Seite inkl. berechneter Prüfziffer).
+- **Konsequenzen:** Risiko R-09 entfällt für den Vergleich. Die angezeigte „QR SGTIN“ und die Spalten `sgtinQr`/CSV „SGTIN“ unterstellen weiterhin 7 Stellen (nur Darstellung). Tests: `ScanViewModelTest` (Prefix-Länge, andere Serial/GTIN).

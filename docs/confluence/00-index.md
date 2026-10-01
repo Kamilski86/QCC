@@ -66,7 +66,7 @@ QCC – Applikationsdokumentation              ← diese Seite (00)
 | Sprache / Stack | Kotlin 2.0.21, Jetpack Compose (BOM 2024.06.00) + Material 3, MVVM, Hilt 2.51, Room 2.6.1, Coroutines/Flow |
 | Hardware | Honeywell CT37 (Barcode, AIDC-SDK) + Zebra RFD8500 (RFID, Zebra RFID API3 SDK, Bluetooth) |
 | Datenbank | Room/SQLite `qcc.db`, Schema **8**, 4 Tabellen |
-| Sprachen der UI | Englisch (Standard), Deutsch, Polnisch (Ressourcen); in der Sprachauswahl wählbar: EN, DE (Polnisch: Entscheidung offen, Seite 13) |
+| Sprachen der UI | Englisch (Standard) und Deutsch (Polnisch wurde am 2026-10-01 entfernt) |
 | Netzwerk | keiner – die App ist offline (kein `INTERNET`-Permission) |
-| Tests | 96 Unit-/Robolectric-Tests, keine instrumentierten Tests |
+| Tests | 99 Unit-/Robolectric-Tests, keine instrumentierten Tests |
 | Auslieferung | Release-Build baut (R8-Regeln für die Vendor-SDKs), **Signierung und Verteilungsweg offen**, siehe Seite 10 |

@@ -17,5 +17,5 @@ Einstieg für Entwickler: [`SETUP.md`](SETUP.md).
 ```bash
 ./gradlew assembleDebug        # Debug-APK
 ./gradlew installDebug         # auf verbundenes Gerät installieren
-./gradlew test                 # Unit-Tests (96)
+./gradlew test                 # Unit-Tests (99)
 ```
