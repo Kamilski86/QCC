@@ -58,7 +58,7 @@ QCC reduziert Fehlzuordnungen zwischen physischem RFID-Tag und gedruckter Kennze
 | **P2 Schichtleiter** (sekundär) | Tageszähler, Mismatch-Quote | – |
 | **P3 Prozessverantwortlicher / Qualität** (sekundär) | Ursachenanalyse, exportierbare Daten | – |
 | **P4 Filialmitarbeiter / Reklamationsbearbeitung** (Duplicate Finder; aus der Aufgabenstellung abgeleitet) | Duplikate finden, entfernen, dokumentieren | – |
-| **IT / Entwicklung** | Betrieb, Weiterentwicklung | Entwickler: Repo-Besitzer (GitHub `Kamilski86/KaJak`) |
+| **IT / Entwicklung** | Betrieb, Weiterentwicklung | Entwickler: Repo-Besitzer (GitHub `Kamilski86/QCC`) |
 | **Product Owner / Auftraggeber** | Scope, Priorisierung, Abnahme | **[zu bestätigen]** |
 
 ## 6 Geschäftsziele und KPI-Definitionen

@@ -26,7 +26,7 @@
 ## 2 Einrichtung
 
 1. **Android Studio** in einer **aktuellen stabilen Version** installieren (SETUP.md nennt Hedgehog 2023.1 als Untergrenze; das eingesetzte AGP 8.13.2 setzt eine entsprechend neue Android-Studio-Version voraus) – mit JDK 17.
-2. Repository klonen (`origin`: `https://github.com/Kamilski86/KaJak.git`) und den Projektordner öffnen; Gradle-Sync abwarten (bei Problemen *Invalidate Caches / Restart* oder `./gradlew clean`).
+2. Repository klonen (`origin`: `https://github.com/Kamilski86/QCC.git`) und den Projektordner öffnen; Gradle-Sync abwarten (bei Problemen *Invalidate Caches / Restart* oder `./gradlew clean`).
 3. **Vendor-SDKs** liegen im Repository (`app/libs/*.aar`, `vendor/zebra/*.aar`) und werden per `fileTree` eingebunden – kein Download nötig.
 4. Gerät: CT37 per USB, **USB-Debugging** aktivieren (Einstellungen → Über das Telefon → Build-Nummer 7× tippen → Entwickleroptionen). Zebra RFD8500 koppeln.
 
