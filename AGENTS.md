@@ -18,7 +18,7 @@ app/                  — MainActivity, Hilt @HiltAndroidApp, NavHost setup
 feature/{name}/       — UI: Composable screens + ViewModels (@HiltViewModel)
 domain/model/         — Shared entities (Models.kt, all @Serializable)
 domain/usecase/       — CompareScansUseCase (comparison business logic)
-data/local/           — Room: Entities, DAOs, Migrations (schema v6)
+data/local/           — Room: Entities, DAOs, Migrations (schema v8)
 data/repository/      — MismatchRepository (Room → CSV export bridge)
 device/{vendor}/      — Hardware gateways (Honeywell, Zebra)
 core/gs1/             — Gs1ParserService (GS1/EPC parsing, pure Kotlin)
@@ -71,10 +71,15 @@ sealed class Screen(val route: String) {
 Hard-coded string routes (`"reader"`, `"language"`, `"about"`) also exist in `MainActivity`. Next refactor: move all routes to sealed class.
 
 ### Room Database
-- **Schema version 6** (see `Migrations.kt`)
-- **Tables:** `scans` (all results), `mismatches` (mismatch subset)
+- **Schema version 8** (see `Migrations.kt`)
+- **Tables:** `scans` (all results), `mismatches` (mismatch subset), `duplicate_searches`, `duplicate_finds` (one find per TID per search; `previousFoundAt` marks a re-found tag)
 - **Migration constraint:** SQLite API < 35 has no `DROP COLUMN` → use recreate-table pattern (see `MIGRATION_5_6`)
 - DB file: `qcc.db`
+
+---
+
+### Duplicate Finder & Trigger Ownership
+The duplicate finder (`feature/duplicates/`) is destination-scoped. It claims the Zebra trigger via `claimTriggerMode(owner, mode)` / `releaseTriggerMode(owner)` (`TriggerModeArbiter`: only the latest owner may hand it back to QCC) and `ScanViewModel.setSuspended(true)` pauses QCC while that route is open. Full documentation: `docs/confluence/00-index.md`.
 
 ---
 
@@ -164,7 +169,7 @@ Error messages are user-readable English/German/Polish. Parse errors in `Gs1Pars
 
 ## Planned Changes (Roadmap)
 
-1. **App rename** — "QCC" → "MV-C" (two hardcoded strings in `MainActivity.kt`, lines 143 & 203, pending `stringResource(R.string.app_name)`)
+1. **App rename** — "QCC" → "MV-C" (hardcoded "QCC" literals remain in `DashboardScreen` (title) and `AboutScreen`; `MainActivity` already uses `stringResource(R.string.app_name)`)
 2. **Modular tile home screen** — `Splash → Dashboard` replaced with `Home` screen containing use-case tiles (Scan, Inbound Read, etc.). **ViewModels will move to per-destination scope.**
 3. **Inbound Read use case** — SSCC barcode parsing + multi-tag RFID inventory + EPCIS 2.0 integration (Retrofit + OkHttp). **INTERNET permission not yet in `AndroidManifest.xml`.**
 

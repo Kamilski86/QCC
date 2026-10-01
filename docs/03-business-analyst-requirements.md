@@ -1,5 +1,7 @@
 # Business Analyst Sicht - Requirements
 
+> **Archiv (Stand April 2026).** Dieses Dokument wird nicht mehr gepflegt und ist teilweise überholt (z. B. Schema v6, Scan-Buttons im Dashboard, Sendeleistungs-Einstellung). Maßgeblich ist die aktuelle Dokumentation unter [`docs/confluence/`](confluence/00-index.md).
+
 ## Dokumentsteuerung
 
 - Version: 1.1 (Rueckwirkende Konsolidierung)

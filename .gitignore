@@ -19,3 +19,6 @@ vendor/zebra/ZIOTCSampleApp/
 
 .superpowers/
 .kotlin/
+
+# generierte Gesamtdatei der Doku
+docs/confluence/QCC-Komplettdokumentation.md

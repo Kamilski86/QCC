@@ -28,6 +28,10 @@ This is an Android project built with Gradle. All commands run from the repo roo
 
 There is no emulator target — the app requires physical Honeywell CT37 (barcode) and Zebra RFD8500 (RFID) hardware. There are no instrumented tests currently. Unit tests use Robolectric + in-memory Room (see `app/src/test/.../testutil`). `./gradlew lintDebug` currently crashes in this environment with "Exception occurred when reading Kotlin metadata" (also on the pre-feature baseline commit 499466a) — known issue, not caused by the duplicate finder.
 
+## Documentation
+
+Full application documentation (background, requirements, architecture, data model, operations, security, glossary) lives in `docs/confluence/` (start at `00-index.md`). Update the affected pages with every behaviour, schema or interface change (checklist: `docs/confluence/15-anhang.md`, section B).
+
 ## Architecture Overview
 
 **Stack:** Kotlin + Jetpack Compose + Material3, MVVM, Hilt DI, Room, Jetpack Navigation Compose. Min SDK 28, Target SDK 34.
@@ -135,7 +139,7 @@ Three locale variants: `values/` (EN), `values-de/` (DE), `values-pl/` (PL). All
 
 ## Planned Changes (context for future work)
 
-1. **App rename** — Display name changing from "QCC" to "MV-C". Two hardcoded `"QCC"` literals remain in `MainActivity.kt` (lines 143 and 203) pending replacement with `stringResource(R.string.app_name)`.
+1. **App rename** — Display name changing from "QCC" to "MV-C". Hardcoded `"QCC"` literals remain in `DashboardScreen.kt` (title) and `AboutScreen.kt`, pending replacement with `stringResource(R.string.app_name)` (`MainActivity` already uses it).
 
 2. **Modular tile home screen** — A new `Home` screen with use-case tiles will replace the current direct `Splash → Dashboard` flow. QCC becomes one tile; additional use cases will be added as tiles. ViewModels will need to move to per-destination scope.
 

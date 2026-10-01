@@ -4,6 +4,8 @@
 - Status: Umgesetzt und auf CT37 + RFD8500 abgenommen (2026-09-30); Test mit zwei gleichzeitig gehaltenen Duplikaten steht noch aus
 - Scope: Neuer Use Case in der QCC-App (Honeywell CT37 + Zebra RFD8500)
 
+> **Hinweis (2026-10-01):** Entwurfsdokument; Teile sind überholt – TID-Eindeutigkeit gilt inzwischen **je Suche** (Wiederfunde zählen mit Datum, Schema 8), „Apply“/„Read with reader“ und die Spalte „Last“ entfielen, Warnungen/Fehler sind Dialoge, der Trigger-Modus hat einen Besitzer. Maßgeblich: [`docs/confluence/`](../../confluence/00-index.md).
+
 ## 1) Problem und Ziel
 
 Ein Tag-Produzent hat dieselbe SGTIN / denselben EPC auf ca. 480 RFID-Tags codiert. Ein EPC muss eindeutig sein. Die betroffenen Artikel müssen in den Filialen einzeln gefunden, aus dem Verkauf genommen und für die Reklamation dokumentiert werden.

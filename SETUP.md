@@ -113,9 +113,9 @@ APK liegt danach unter:
 ```
 Splash → Dashboard
            └── Drawer-Menü:
-                ├── Scan        — QR + RFID Vergleich
-                ├── Export      — CSV-Export der Mismatch-Daten
-                ├── Reader      — Zebra Reader Einstellungen
+                ├── Dashboard       — QR + RFID Vergleich per Pistolen-Trigger, Reset, CSV-Export, „Find duplicates“
+                ├── Find duplicates — Duplikatsuche (auch über Button im Dashboard)
+                ├── Reader      — Zebra Reader Status / Verbinden
                 ├── Language    — Sprachauswahl (DE / EN / PL)
                 └── About       — App-Informationen
 ```
@@ -125,7 +125,7 @@ Splash → Dashboard
 ## Datenbank
 
 - Room-Datenbank: `qcc.db`
-- Schema Version: **6**
+- Schema Version: **8** (Tabellen `scans`, `mismatches`, `duplicate_searches`, `duplicate_finds`)
 - Liegt lokal auf dem Gerät unter dem App-Datenpfad
 - **Kein manuelles Setup nötig** — wird beim ersten App-Start automatisch angelegt
 
@@ -161,7 +161,7 @@ Die App unterstützt drei Sprachen:
 |-------|--------|
 | `AGENTS.md` | Architektur-Übersicht, Entscheidungen, Code-Muster |
 | `CLAUDE.md` | Build-Befehle, Workflow-Prinzipien |
-| `docs/` | Fachliche Anforderungen, Architektur, Testdoku |
+| `docs/confluence/` | Vollständige Applikationsdokumentation (Einstieg: `00-index.md`) |
 
 ---
 
