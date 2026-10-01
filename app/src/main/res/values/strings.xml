@@ -1,21 +1,12 @@
 <resources>
     <string name="app_name">QCC</string>
 
-    <string name="setup_support">Setup Support</string>
-    <string name="help_connect_reader">Should we help you connect an RFID reader?</string>
-    <string name="available_readers">Available Readers</string>
-    <string name="yes_help_me">Yes, help me</string>
-    <string name="no_thanks">No, thanks</string>
 
     <string name="dashboard">Dashboard</string>
     <string name="reader">Reader</string>
-    <string name="export">Export</string>
     <string name="language">Language</string>
     <string name="about">About</string>
 
-    <string name="user_id">User ID</string>
-    <string name="password">Password</string>
-    <string name="login">Login</string>
 
     <string name="scans_today">Scans today</string>
     <string name="mismatches_today">Mismatches today</string>
@@ -28,33 +19,18 @@
 
     <string name="reader_settings">Reader Settings</string>
     <string name="status">Status</string>
-    <string name="battery">Battery</string>
     <string name="connect">Connect</string>
 
-    <string name="app_version">App Version</string>
-    <string name="path">Path</string>
 
     <string name="export_mismatches_csv">Export Mismatches (CSV)</string>
 
-    <string name="manual_entry_title">Manual GTIN Entry</string>
-    <string name="manual_entry_question">Would you like to enter the GTIN manually?</string>
-    <string name="tap_for_manual_entry">Manual Entry</string>
-    <string name="enter_gtin">Enter GTIN</string>
-    <string name="cancel">Cancel</string>
-    <string name="yes">Yes</string>
-    <string name="no">No</string>
-    <string name="fourteen_digits_required">14 digits required</string>
 
     <string name="rfid_power">Antenna Power</string>
     <string name="apply_power_hint">Recommendation: keep the read power low so only tags directly at the reader are captured.</string>
 
-    <string name="actions">Actions</string>
-    <string name="current_scan">Current Scan</string>
     <string name="match">Match</string>
     <string name="mismatch">Mismatch</string>
     <string name="ok">OK</string>
-    <string name="choose">Choose</string>
-    <string name="back">Back</string>
 
     <string name="find_duplicates">Find duplicates</string>
     <string name="dup_target_hint">EPC or SGTIN</string>

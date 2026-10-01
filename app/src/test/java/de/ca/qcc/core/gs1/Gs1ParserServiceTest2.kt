@@ -17,15 +17,6 @@ class Gs1ParserServiceTest2 {
     }
 
     @Test
-    fun parseManualQrGtin_accepts14DigitGtin() {
-        val result = parser.parseManualQrGtin("04065546927682")
-
-        assertEquals("04065546927682", result.gtin)
-        assertEquals("04065546927682", result.rawValue)
-        assertNull(result.serial)
-    }
-
-    @Test
     fun parseEpcToSgtin_convertsKnownExampleCorrectly() {
         val result = parser.parseEpcToSgtin("3014F824285A980300000006")
 

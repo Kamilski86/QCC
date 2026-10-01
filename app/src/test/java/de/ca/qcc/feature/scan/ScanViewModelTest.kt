@@ -101,16 +101,6 @@ class ScanViewModelTest {
     }
 
     @Test
-    fun manualGtinWithoutSerial_mismatchIsPersisted() = runTest {
-        viewModel.setManualQrGtin("04065546927682")
-        rfid.tags.emit(matchingEpc)
-
-        assertEquals(ComparisonStatus.MISMATCH, viewModel.uiState.value.comparison.status)
-        assertEquals(1, scanCount())
-        assertEquals(1, mismatchCount())
-    }
-
-    @Test
     fun rfidFirstThenQr_matchesAndPersistsOnlyScan() = runTest {
         rfid.tags.emit(matchingEpc)
         barcode.scans.emit(validQr)

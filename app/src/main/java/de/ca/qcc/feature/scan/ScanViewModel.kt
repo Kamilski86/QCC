@@ -37,7 +37,6 @@ data class ScanUiState(
     val readerStatus: ReaderStatus = ReaderStatus(),
     val scansToday: Int = 0,
     val error: String? = null,
-    val manualQrConfirmed: Boolean = false,
     val isScanning: Boolean = false,
     val readerPower: Float = 1f
 )
@@ -152,8 +151,7 @@ class ScanViewModel @Inject constructor(
                     ComparisonStatus.IDLE,
                     message = "Starte neuen Scan"
                 ),
-                error = null,
-                manualQrConfirmed = false
+                error = null
             )
         }
     }
@@ -166,29 +164,6 @@ class ScanViewModel @Inject constructor(
                 .onFailure { _uiState.value = _uiState.value.copy(error = it.toReadableError()) }
             _uiState.value = _uiState.value.copy(isScanning = false)
         }
-    }
-
-    fun setManualQrGtin(gtin: String) {
-        runCatching { parser.parseManualQrGtin(gtin) }
-            .onSuccess { parsed ->
-                _uiState.value = _uiState.value.copy(
-                    qr = parsed,
-                    rfid = null,
-                    comparison = ComparisonResult(
-                        ComparisonStatus.IDLE,
-                        message = "Manuelle GTIN übernommen"
-                    ),
-                    error = null,
-                    manualQrConfirmed = true
-                )
-                signalScan()
-            }
-            .onFailure { ex ->
-                _uiState.value = _uiState.value.copy(
-                    error = ex.message ?: "Ungültige manuelle GTIN",
-                    manualQrConfirmed = false
-                )
-            }
     }
 
     fun triggerRfidScan() {
@@ -246,8 +221,7 @@ class ScanViewModel @Inject constructor(
                         ComparisonStatus.IDLE,
                         message = "QR gelesen"
                     ),
-                    error = null,
-                    manualQrConfirmed = false
+                    error = null
                 )
                 signalScan()
                 compareIfReady()
@@ -317,8 +291,7 @@ class ScanViewModel @Inject constructor(
                 ComparisonStatus.IDLE,
                 message = "Bereit"
             ),
-            error = null,
-            manualQrConfirmed = false
+            error = null
         )
 
         // Stop the QR scanner when resetting

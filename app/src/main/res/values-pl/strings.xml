@@ -1,21 +1,12 @@
 <resources>
     <string name="app_name">QCC</string>
 
-    <string name="setup_support">Wsparcie konfiguracji</string>
-    <string name="help_connect_reader">Czy pomóc Ci połączyć czytnik RFID?</string>
-    <string name="available_readers">Dostępne czytniki</string>
-    <string name="yes_help_me">Tak, pomóż mi</string>
-    <string name="no_thanks">Nie, dziękuję</string>
 
     <string name="dashboard">Panel główny</string>
     <string name="reader">Czytnik</string>
-    <string name="export">Eksport</string>
     <string name="language">Język</string>
     <string name="about">O aplikacji</string>
 
-    <string name="user_id">ID użytkownika</string>
-    <string name="password">Hasło</string>
-    <string name="login">Zaloguj</string>
 
     <string name="scans_today">Skany dzisiaj</string>
     <string name="mismatches_today">Rozbieżności dzisiaj</string>
@@ -28,21 +19,11 @@
 
     <string name="reader_settings">Ustawienia czytnika</string>
     <string name="status">Status</string>
-    <string name="battery">Bateria</string>
     <string name="connect">Połącz</string>
 
-    <string name="app_version">Wersja aplikacji</string>
-    <string name="path">Ścieżka</string>
 
     <string name="export_mismatches_csv">Eksportuj rozbieżności (CSV)</string>
 
-    <string name="manual_entry_title">Ręczne wprowadzanie GTIN</string>
-    <string name="manual_entry_question">Czy chcesz wprowadzić GTIN ręcznie?</string>
-    <string name="tap_for_manual_entry">Wprowadzanie ręczne</string>
-    <string name="enter_gtin">Wprowadź GTIN</string>
-    <string name="yes">Tak</string>
-    <string name="no">Nie</string>
-    <string name="fourteen_digits_required">Wymagane 14 cyfr</string>
 
     <string name="rfid_power">Moc anteny</string>
     <string name="apply_power_hint">Zalecenie: używaj niskiej mocy odczytu, aby odczytywać tylko tagi znajdujące się bezpośrednio przy czytniku.</string>

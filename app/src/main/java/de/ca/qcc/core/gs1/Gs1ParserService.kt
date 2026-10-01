@@ -38,19 +38,6 @@ class Gs1ParserService {
         )
     }
 
-    fun parseManualQrGtin(gtin: String): QrScanResult {
-        val normalized = gtin.trim()
-        require(normalized.matches(Regex("""\d{14}"""))) {
-            "Manuelle GTIN muss genau 14-stellig sein"
-        }
-
-        return QrScanResult(
-            rawValue = normalized,
-            gtin = normalized,
-            serial = null
-        )
-    }
-
     fun parseEpcToSgtin(
         epc: String,
         readerName: String? = null,
