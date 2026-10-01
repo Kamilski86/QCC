@@ -4,13 +4,13 @@
 |---|---|
 | **Dokumentversion** | 2.0 (vollständige Neufassung, ersetzt die Rollen-Dokumente `docs/01`–`05` vom April 2026) |
 | **Stand** | 2026-10-01 |
-| **Code-Stand** | Branch `fix/duplicate-finder-ux`, Commit `88d0b55` · App-Version `0.1.0` (versionCode 1) · DB-Schema 8 |
+| **Code-Stand** | Branch `feature/honeywell-ih45` (aufbauend auf `fix/duplicate-finder-ux`; IH45-Arbeit noch nicht committet) · App-Version `0.1.0` (versionCode 1) · DB-Schema 8 |
 | **Status** | Freigabe-Entwurf – offene, zu bestätigende Punkte stehen in [13 Roadmap, Risiken, offene Punkte](13-roadmap-risiken-offene-punkte.md) |
 | **Sprache** | Deutsch (Code, Bezeichner und UI-Standardsprache: Englisch) |
 
 ## Worum es geht
 
-**QCC** ist eine Android-App für das Handheld **Honeywell CT37** in Kombination mit dem Bluetooth-RFID-Reader **Zebra RFD8500**. Sie unterstützt zwei Anwendungsfälle:
+**QCC** ist eine Android-App für das Handheld **Honeywell CT37** in Kombination mit einem UHF-RFID-Reader: dem Bluetooth-Reader **Zebra RFD8500** oder – seit 2026-10-01 – dem per USB angeschlossenen **Honeywell IH45** (der IH45 hat Vorrang, solange er steckt). Sie unterstützt zwei Anwendungsfälle:
 
 1. **QCC-Vergleich (Kernfunktion):** Prüft per Pistolen-Trigger, ob der RFID-Tag eines Artikels (SGTIN-96) zum aufgedruckten 2D-Code (GS1 DataMatrix / QR) passt – Ergebnis `MATCH` oder `MISMATCH`, lokal protokolliert, als CSV exportierbar.
 2. **Duplikatsuche (Find duplicates):** Führt den Anwender per Nähe-Anzeige, Ton und Vibration zu RFID-Tags mit **identischer SGTIN/EPC** und erfasst jeden Fund eindeutig über die **TID** des Chips; Abschluss mit CSV-Export.
@@ -64,9 +64,9 @@ QCC – Applikationsdokumentation              ← diese Seite (00)
 | Anzeigename | „QCC“ (geplante Umbenennung in „MV-C“, siehe Seite 13) |
 | Plattform | Android, minSdk 28, targetSdk/compileSdk 34, Zielgerät CT37 mit Android 14 |
 | Sprache / Stack | Kotlin 2.0.21, Jetpack Compose (BOM 2024.06.00) + Material 3, MVVM, Hilt 2.51, Room 2.6.1, Coroutines/Flow |
-| Hardware | Honeywell CT37 (Barcode, AIDC-SDK) + Zebra RFD8500 (RFID, Zebra RFID API3 SDK, Bluetooth) |
+| Hardware | Honeywell CT37 (Barcode, AIDC-SDK) + RFID-Reader: Zebra RFD8500 (Zebra RFID API3 SDK, Bluetooth) **oder** Honeywell IH45 (Honeywell RFID SDK, USB) |
 | Datenbank | Room/SQLite `qcc.db`, Schema **8**, 4 Tabellen |
 | Sprachen der UI | Englisch (Standard) und Deutsch (Polnisch wurde am 2026-10-01 entfernt) |
 | Netzwerk | keiner – die App ist offline (kein `INTERNET`-Permission) |
-| Tests | 99 Unit-/Robolectric-Tests, keine instrumentierten Tests |
-| Auslieferung | Release-Build baut (R8-Regeln für die Vendor-SDKs), **Signierung und Verteilungsweg offen**, siehe Seite 10 |
+| Tests | 118 Unit-/Robolectric-Tests, keine instrumentierten Tests |
+| Auslieferung | Release-Build baut und ist signiert (R8-Regeln für die Vendor-SDKs); **mit IH45 auf dem Gerät noch nicht getestet**, Verteilungsweg offen, siehe Seite 10 |

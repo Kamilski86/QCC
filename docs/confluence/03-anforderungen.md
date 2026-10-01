@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Stand** | 2026-10-01 |
-| **Quellen** | bisherige Anforderungsdokumente (`docs/03`), Design-Spec Duplicate Finder, Code und Tests |
+| **Quellen** | bisherige Anforderungsdokumente (`docs/03`), Design-Spec Duplicate Finder, Code und Tests, Hardware-Abnahme IH45 (2026-10-01) |
 | **Status-Legende** | ✅ umgesetzt und getestet · 🟡 teilweise / Abweichung · ⛔ nicht umgesetzt · 🧪 nur manuell auf Hardware verifiziert |
 | **Priorität** | MoSCoW: Must / Should / Could |
 
@@ -14,6 +14,7 @@ flowchart LR
     OP[Operator / Filialmitarbeiter] -->|Trigger, Touch| APP[QCC App auf CT37]
     HW1[Honeywell CT37 Scanner] -->|QR-Rohdaten| APP
     HW2[Zebra RFD8500 per Bluetooth] -->|EPC, TID, Nähe, Trigger| APP
+    HW3[Honeywell IH45 per USB] -->|EPC, TID, RSSI-Nähe, Trigger| APP
     APP -->|Ton, Vibration| OP
     APP --> DB[(Room SQLite)]
     APP -->|CSV| DOC[Documents-Ordner]
@@ -23,7 +24,8 @@ flowchart LR
 |---|---|
 | Operator | führt Scanzyklen aus, bewertet das Ergebnis |
 | Filialmitarbeiter | führt die Duplikatsuche durch |
-| Zebra RFD8500 | liefert EPC/TID, Trigger-Ereignisse, Nähewerte |
+| Zebra RFD8500 | liefert EPC/TID, Trigger-Ereignisse, Nähewerte (Bluetooth) |
+| Honeywell IH45 | gleichwertiger zweiter RFID-Reader (USB, Vorrang vor dem Zebra); Nähe aus RSSI und Leistungsstufen |
 | Honeywell CT37 | Barcode-Scanner, Ton, Vibration, Anzeige |
 | Schichtleiter / Qualität | liest Zähler und CSV |
 
@@ -65,9 +67,10 @@ Vor einem neuen Wert nach abgeschlossenem Zyklus (QR+RFID vorhanden oder Ergebni
 - **Trace:** `MismatchRepository.exportPendingCsv`, `MediaStoreCsvDocumentWriter`.
 
 ### FR-09 Reader-Betrieb (Should) ✅
-- ✅ Auto-Discovery und Verbindung zum ersten gefundenen Reader beim Start (`ScanViewModel.init`); „Connect“ im Reader-Screen für Reconnect; Statustext.
-- ✅ Sendeleistung: Mapping Pegel 1–30 → Leistungsindex, Standard 1 (= Index 0, Minimum – bewusst niedrig, damit nur Tags direkt an der Pistole gelesen werden). Der Reader-Screen **zeigt** den Wert („Level 1 of 30“) mit Empfehlungstext an; ein Bedienelement ist **bewusst nicht** vorgesehen (Entscheidung 2026-10-01; früher irreführend als „dBm“ beschriftet).
-- **Trace:** `ZebraRfd8500Gateway.discoverReaders/connect/setPower`.
+- ✅ Auto-Discovery und Verbindung zum ersten gefundenen Reader beim Start (`ScanViewModel.init`); „Connect“ im Reader-Screen für Reconnect; Statustext. **Zwei Reader:** der Honeywell IH45 (USB) hat Vorrang, solange er steckt, sonst der Zebra RFD8500 (Bluetooth); es ist immer nur einer verbunden, An-/Abstecken des USB-Kabels löst automatisch Neuwahl und Verbinden aus (`SwitchingRfidReaderGateway`, ADR-20) 🧪.
+- ✅ **Verbindungsanzeige:** grünes Antennen-Icon oben rechts auf jedem Screen außer Splash, solange ein Reader verbunden ist; Toast beim Verbinden („<Name> connected“) und Trennen („RFID reader disconnected“), nicht beim App-Start mit schon verbundenem Reader 🧪.
+- ✅ Sendeleistung: Mapping Pegel 1–30 → Leistungsindex, Standard 1 (= Index 0, Minimum – bewusst niedrig, damit nur Tags direkt an der Pistole gelesen werden). Der Reader-Screen **zeigt** den Wert („Level 1 of 30“) mit Empfehlungstext an; ein Bedienelement ist **bewusst nicht** vorgesehen (Entscheidung 2026-10-01; früher irreführend als „dBm“ beschriftet). Der Pegel wirkt **nur beim Zebra**; der IH45 läuft immer mit voller Leistung (30 dBm) und begrenzt die Reichweite über die Auswahl nach RSSI (ADR-20).
+- **Trace:** `SwitchingRfidReaderGateway`, `ZebraRfd8500Gateway.discoverReaders/connect/setPower`, `HoneywellIh45Gateway`, `ReaderConnectionIndicator` (`MainActivity`) · **Tests:** `SwitchingRfidReaderGatewayTest`, `HoneywellIh45GatewayHelpersTest`; Gateway-Verhalten nur auf Hardware.
 
 ## 3 Funktionale Anforderungen – Duplikatsuche
 
@@ -90,15 +93,16 @@ Optionales Freitextfeld „Store“, vorbelegt mit dem zuletzt verwendeten Wert 
 „Start search“ nur bei nicht-leerer Eingabe, verbundenem Reader und nicht beschäftigtem ViewModel. Der Start wertet die Eingabe selbst aus. Es ist immer nur **eine** Suche offen; eine noch offene Vorgängersuche wird ohne Export geschlossen.
 
 ### FR-14 Ortung (Must) ✅🧪
-- Trigger **halten** startet die Ortung, **loslassen** stoppt sie.
+- Trigger **halten** startet die Ortung, **loslassen** stoppt sie. Wird der Trigger **am Tag** losgelassen (Nähe war innerhalb der letzten 600 ms ≥ 95 %), bestätigt das zusätzlich den Fund (FR-23).
 - Schalter **„Continuous search“** (Standard aus): Ortung läuft ohne Trigger; der Trigger wird dann ignoriert.
 - Ortung ist immer **exakt** (volle 96-Bit-Maske), siehe Seite 07 (Hardware-Befund).
+- Beim **IH45** wird die Nähe aus dem RSSI des gesuchten EPC berechnet; im Nahbereich senkt das Gateway die Sendeleistung stufenweise (Stufen 0/1/2, Anzeige bis 80 % / 90 % / 100 %), siehe Seite 07, Abschnitt 3a.4 und ADR-20.
 
 ### FR-15 Nähe-Feedback (Must) ✅🧪
-Relative Nähe 0–100 %: Tacho mit Prozentzahl; Beep über `ToneGenerator` und Vibration im selben Takt; Pause zwischen den Beeps sinkt linear von 1000 ms (1 %) auf 80 ms (100 %); bei 0 % still. Ton und Vibration über das **CT37**, nicht den Beeper der RFD8500. **Tests:** `BeepIntervalTest`.
+Relative Nähe 0–100 %: Tacho mit Prozentzahl; Beep über `ToneGenerator` und Vibration im selben Takt; Pause zwischen den Beeps sinkt linear von 1000 ms (1 %) auf 80 ms (100 %); bei 0 % still. Ton und Vibration über das **CT37**, nicht den Beeper der RFD8500. **Tests:** `BeepIntervalTest`. Zusätzlich liefert `ProximityFeedback.resultTone(success)` einen hellen Bestätigungston (`TONE_PROP_ACK`, 300 ms, 150 ms Vibration) bei gespeichertem Fund und einen Warnton (`TONE_PROP_NACK`) bei jeder anderen Meldung (FR-23).
 
 ### FR-16 Confirm find / TID-Prüfung (Must) ✅🧪
-Eine laufende Ortung pausiert; das Gateway liest im Nahbereich (5 % Leistung, 700-ms-Fenster) die TIDs (96 Bit) aller Tags mit exakt passendem EPC:
+Eine laufende Ortung pausiert; das Gateway liest im Nahbereich (Zebra: 5 % Leistung, 700-ms-Fenster) die TIDs (96 Bit) aller Tags mit exakt passendem EPC:
 
 | Ergebnis | Reaktion | Zählt? |
 |---|---|---|
@@ -110,11 +114,13 @@ Eine laufende Ortung pausiert; das Gateway liest im Nahbereich (5 % Leistung, 70
 
 Danach läuft die Ortung weiter, wenn „Continuous search“ aktiv ist – bei offenem Dialog erst nach **OK**.
 
+Beim **IH45** gilt statt „5 % Leistung“ die RSSI-Auswahl: es zählen Tags mit RSSI ≥ −50 dBm und höchstens 5 dB unter dem stärksten Tag (Fenster 700 ms); verbleiben mehrere Tags, erscheint „Several duplicates detected“. Die Leistung wird nicht gesenkt (ADR-20). Die TID stammt aus den Lesungen der Ortung (Stufe 0) oder wird frisch gelesen.
+
 ### FR-17 Eindeutigkeit und Wiederfunde (Must) ✅
 Pro Suche zählt eine TID **einmal** (Datenbank-Constraint `UNIQUE(searchId, tid)`). Wird dieselbe TID in einer **späteren** Suche erneut bestätigt (z. B. weil jemand den Tag zurückgelegt hat), **zählt sie erneut** und speichert in `previousFoundAt` den Zeitpunkt des **letzten** früheren Funds; dieser steht im Dialog und in der CSV-Spalte „Previously Found“. **Tests:** `DuplicateSearchRepositoryTest`, `MigrationTest`.
 
 ### FR-18 Meldungen (Must) ✅
-Alle Warnungen und Fehler (kein Tag, mehrere Tags, Reader nicht verbunden/Fehler, ungültiges Ziel, Anlesen ohne/mit mehreren Tags, Export-Fehler, „Already found“, „Found again“) erscheinen als **Dialog mit OK**, der den Bildschirm blockiert. Während ein Dialog offen ist, werden Hardware-Trigger ignoriert. Reiner Erfolg („Saved“, „Exported“, „Nothing exported“) erscheint als Snackbar und verschiebt das Layout nicht. **Tests:** `DuplicateSearchViewModelTest.onlyPlainSuccessMessages_…`, `pendingAcknowledgement_…`, `continuousMode_waitsForDismissBeforeLocatingAgain`.
+Alle Warnungen und Fehler (kein Tag, mehrere Tags, Reader nicht verbunden/Fehler, ungültiges Ziel, Anlesen ohne/mit mehreren Tags, Export-Fehler, „Already found“, „Found again“) erscheinen als **Dialog mit OK**, der den Bildschirm blockiert. Während ein Dialog offen ist, startet ein Hardware-Trigger keine Ortung; ein **Trigger-Druck schließt den Dialog** (wie OK, FR-23). Reiner Erfolg („Saved“, „Exported“, „Nothing exported“) erscheint als Snackbar und verschiebt das Layout nicht. **Tests:** `DuplicateSearchViewModelTest.onlyPlainSuccessMessages_…`, `pendingAcknowledgement_…`, `continuousMode_waitsForDismissBeforeLocatingAgain`.
 
 ### FR-19 End search und Export (Must) ✅
 Ortung stoppen, Suche als beendet markieren, **CSV automatisch exportieren** (`duplicates_<yyyyMMdd_HHmmss>_<searchId>.csv`, Spalten `Timestamp,SGTIN,EPC,TID,Find No,Store,Previously Found`, Köpfe immer englisch), Dateiname anzeigen, zurück zu Phase 1. Ohne Funde keine Datei („No duplicates found – nothing exported“). Der Abschluss ist idempotent; schlägt der Export fehl, bleibt die Suche offen und kann wiederholt werden.
@@ -132,11 +138,20 @@ Der Duplicate Finder darf den QCC-Vergleich **nie blockieren oder beeinflussen**
 ### FR-22 Einstieg (Must) ✅
 Button **„Find duplicates“** im Dashboard (unter „Export Mismatches (CSV)“) und Eintrag im Burger-Menü; es wird nie ein zweiter Duplicates-Eintrag gestapelt (`launchSingleTop`).
 
+### FR-23 Bedienung ohne dritte Hand: Bestätigen durch Loslassen (Must) ✅🧪
+Entscheidung des Product Owners, gilt für **beide Reader** (ADR-21):
+- Trigger **halten** = Ortung. Trigger **am Tag loslassen** (Nähe war innerhalb der letzten 600 ms ≥ 95 %, `CONFIRM_PROXIMITY`) bestätigt den Fund automatisch (wie „Confirm find“, FR-16). Weiter weg loslassen beendet nur die Ortung.
+- Ein **Trigger-Druck schließt Dialoge** (wie OK) und startet dabei keine Ortung.
+- Der Button „Confirm find“ bleibt als Alternative.
+- Rückmeldung: heller Bestätigungston (`TONE_PROP_ACK`, 300 ms, 150 ms Vibration) bei gespeichertem Fund, Warnton (`TONE_PROP_NACK`) bei jeder anderen Meldung (`ProximityFeedback.resultTone(success)`).
+- Hinweistext (`dup_hint_hold_trigger`): EN „Hold trigger, move to the tag, release at the tag to confirm“, DE „Trigger halten, zum Tag führen, am Tag loslassen = bestätigen“.
+- **Tests:** `DuplicateSearchViewModelTest` (4 Tests für Loslassen am Tag, Trigger schließt Dialog, Warnton).
+
 ## 4 Nicht-funktionale Anforderungen
 
 | ID | Anforderung | Nachweis | Status |
 |---|---|---|---|
-| NFR-01 | Läuft auf Android ab API 28; Ziel/Compile 34 | Build-Konfiguration; Installation auf CT37 (Android 14) | ✅ (API 28–33 nicht getestet; CSV-Export auf API 28 benötigt `WRITE_EXTERNAL_STORAGE`, nicht deklariert) |
+| NFR-01 | Läuft auf Android ab API 28; Ziel/Compile 34 (Honeywell-RFID-SDK: minSdk 26) | Build-Konfiguration; Installation auf CT37 (Android 14) | ✅ (API 28–33 nicht getestet; CSV-Export auf API 28 benötigt `WRITE_EXTERNAL_STORAGE`, nicht deklariert) |
 | NFR-02 | Architektur MVVM, Hilt, Room, Navigation Compose | Strukturreview, Seite 05 | ✅ |
 | NFR-03 | Rückmeldung (Ton/Vibration) unmittelbar nach Scan | manueller Test auf Hardware | 🧪 |
 | NFR-04 | Parse-/Verbindungsfehler als benutzerlesbare Meldung | Negativtests Parser/ViewModel | ✅ (QCC-Meldungen teils deutsch hart codiert) |
@@ -144,9 +159,10 @@ Button **„Find duplicates“** im Dashboard (unter „Export Mismatches (CSV)�
 | NFR-06 | Robuste lokale Persistenz inkl. verlustfreier Migration (Schema 8) | `MigrationTest` (6→7, 7→8), Repository-Tests | ✅ |
 | NFR-07 | Suchmaske des Duplicate Finders ohne Scrollen auf Handheld-Display | `DuplicateSearchScreenLayoutTest` (360×600 dp, Gauge ≥ 80 dp); Anwender-Abnahme CT37 | ✅🧪 |
 | NFR-08 | Offline-Betrieb (kein Netzwerkzugriff) | Manifest ohne `INTERNET` | ✅ |
-| NFR-09 | Nahbereichs-Lesen: nur Tags direkt an der Pistole | Hardware-Spike: 5 % Leistung liest bei Kontakt, ca. 30 cm nichts | 🧪 |
+| NFR-09 | Nahbereichs-Lesen: nur Tags direkt an der Pistole | Zebra: Hardware-Spike, 5 % Leistung liest bei Kontakt, ca. 30 cm nichts. IH45: volle Leistung, Auswahl des stärksten Tags nach RSSI (≥ −50 dBm, ≤ 5 dB unter dem stärksten); Tag am Reader −23…−31 dBm, Nachbartag in der anderen Hand meist ≥ 5 dB schwächer | 🧪 |
 | NFR-10 | Hardware-Zugriff nie im UI-Layer, nur über Gateways | Strukturreview | ✅ |
 | NFR-11 | Keine Blockade zwischen Use Cases (siehe FR-21) | Tests, Hardware | ✅🧪 |
+| NFR-12 | Reader-Verbindung per USB: Auto-Connect nach Einstecken (ca. 5 s) bzw. beim Kaltstart (ca. 2 s) | Hardware-Abnahme 2026-10-01; USB-Abbrüche gelegentlich beobachtet (Seite 13, R-15) | 🧪 |
 
 ## 5 Business Rules
 
@@ -157,20 +173,24 @@ Button **„Find duplicates“** im Dashboard (unter „Export Mismatches (CSV)�
 | BR-03 | EPC muss SGTIN-96-konform sein. |
 | BR-04 | Ein neuer abgeschlossener Zyklus startet mit bereinigten Vorwerten. |
 | BR-05 | Jeder Vergleich erzeugt genau einen `scans`-Datensatz (Mismatch zusätzlich einen `mismatches`-Datensatz). |
-| BR-06 | Pro Bestätigung wird genau **ein** Tag akzeptiert; bei mehreren Treffern muss der Artikel isoliert werden. |
+| BR-06 | Pro Bestätigung wird genau **ein** Tag akzeptiert; bei mehreren Treffern muss der Artikel isoliert werden. Beim IH45 zählen nur Tags mit RSSI ≥ −50 dBm und höchstens 5 dB unter dem stärksten Tag als „am Reader“. |
 | BR-07 | Die **TID** identifiziert einen physischen Tag; je Suche zählt sie einmal. |
 | BR-08 | Eine in früherer Suche gefundene TID zählt in einer späteren Suche erneut und trägt den Zeitpunkt des letzten Vorfunds. |
 | BR-09 | Gefundene Artikel werden physisch entfernt; die App stummschaltet keine Tags. |
 | BR-10 | Ortung und TID-Prüfung suchen immer exakt (volle EPC-Maske). |
 | BR-11 | Es ist höchstens eine Duplikatsuche gleichzeitig offen. |
 | BR-12 | Der Duplicate Finder gibt Trigger und Reader beim Verlassen an den QCC-Modus zurück. |
+| BR-13 | Es ist immer nur **ein** RFID-Reader verbunden; der IH45 (USB) hat Vorrang vor dem Zebra (Bluetooth). |
+| BR-14 | Der IH45 läuft immer mit voller Leistung (30 dBm); der Level-Regler wirkt nur beim Zebra. |
+| BR-15 | Trigger am Tag loslassen (Nähe ≥ 95 % innerhalb der letzten 600 ms) bestätigt einen Fund; ein Trigger-Druck schließt Dialoge. |
 
 ## 6 Randbedingungen
 
-- Zielhardware CT37 + RFD8500; vendor-SDKs als lokale AARs (`app/libs/`, `vendor/zebra/`), nicht über Maven.
+- Zielhardware CT37 + RFD8500 (Bluetooth) oder IH45 (USB); vendor-SDKs als lokale AARs (`app/libs/`, `vendor/zebra/`, `vendor/honeywell/`), nicht über Maven; `API3_LLRP` ist ausgeschlossen.
 - SQLite auf API < 35 kennt kein `DROP COLUMN` → Recreate-Table-Muster bei Schemaänderungen.
 - Das Zebra-Gateway arbeitet im QCC-Modus bewusst im **Einzel-Tag-Modus** (genau ein EPC je Inventory-Session).
 - RFD8500 akzeptiert Locate-Masken nur, wenn sie ab dem MSB lückenlos 1 sind.
+- IH45: Bluetooth-Kopplung wird abgelehnt (nur USB); eine niedrige Sendeleistung zur Reichweitenbegrenzung ist unbrauchbar (ADR-20); der USB-Port des CT37 ist durch den IH45 belegt.
 
 ## 7 Use Cases
 
@@ -178,7 +198,7 @@ Button **„Find duplicates“** im Dashboard (unter „Export Mismatches (CSV)�
 
 | | |
 |---|---|
-| Akteur | Operator (primär); Zebra-Reader, Honeywell-Scanner (sekundär) |
+| Akteur | Operator (primär); RFID-Reader (Zebra oder IH45), Honeywell-Scanner (sekundär) |
 | Vorbedingung | App geöffnet, Dashboard sichtbar, Reader verbunden |
 | Normalfluss | 1) Operator hält Artikel an die Pistole und drückt den Trigger. 2) System startet QR- und RFID-Lesung. 3) System parst beide Werte, aktualisiert die Anzeige. 4) Sobald beide da sind, Vergleich. 5) Ergebnis mit Farbe, Ton, Vibration. 6) Persistenz in `scans` (+ `mismatches`). |
 | Alternativen | A1 Umgekehrte Reihenfolge. A2 Neuer Zyklus nach abgeschlossenem Vergleich löscht Vorwerte. |
@@ -190,8 +210,8 @@ Button **„Find duplicates“** im Dashboard (unter „Export Mismatches (CSV)�
 |---|---|
 | Akteur | Filialmitarbeiter |
 | Vorbedingung | Reader verbunden; Zielwert bekannt oder ein Duplikat zum Anlesen verfügbar |
-| Normalfluss | 1) „Find duplicates“ öffnen. 2) Ziel per Anlesen, EPC oder SGTIN vorgeben (+ optional Filiale). 3) „Start search“. 4) Trigger halten, mit dem Reader über die Ware streichen: Tacho, Beep, Vibration führen zum Artikel. 5) Artikel entnehmen, direkt an die Pistole halten, „Confirm find“. 6) Meldung beachten, Artikel entfernen. 7) Schritte 4–6 wiederholen. 8) „End search“ → CSV. |
-| Alternativen | A1 „Continuous search“ ohne Trigger. A2 Suche verlassen und später fortsetzen (offene Suche bleibt gespeichert). |
+| Normalfluss | 1) „Find duplicates“ öffnen. 2) Ziel per Anlesen, EPC oder SGTIN vorgeben (+ optional Filiale). 3) „Start search“. 4) Trigger halten, mit dem Reader über die Ware streichen: Tacho, Beep, Vibration führen zum Artikel. 5) Artikel entnehmen, direkt an die Pistole halten und „Confirm find“ tippen – oder den Trigger **am Tag loslassen** (FR-23). 6) Meldung beachten, Artikel entfernen. 7) Schritte 4–6 wiederholen. 8) „End search“ → CSV. |
+| Alternativen | A1 „Continuous search“ ohne Trigger. A2 Suche verlassen und später fortsetzen (offene Suche bleibt gespeichert). A3 Bestätigen durch Loslassen des Triggers am Tag. |
 | Ausnahmen | E1 0 oder mehrere Tags → Dialog, Artikel isolieren/prüfen. E2 TID schon gezählt → Dialog „Already found“. E3 Tag aus früherer Suche → zählt, Dialog „Found again“ mit Datum. E4 Reader getrennt → Ortung stoppt, Dialog; Funde sind bereits gespeichert. |
 
 ## 8 Akzeptanzkriterien (Gherkin)
@@ -248,6 +268,21 @@ AC-11 Company-Prefix-Länge
 AC-10 Eine Bildschirmseite
   Given die Suchphase auf einem 360x600dp-Display
   Then sind alle Karten und beide Buttons ohne Scrollen sichtbar
+
+AC-12 Bestätigen durch Loslassen
+  Given die Ortung läuft und die Nähe war innerhalb der letzten 600 ms mindestens 95 %
+  When ich den Trigger loslasse
+  Then wird der Fund wie bei "Confirm find" registriert (heller Ton bei Erfolg, sonst Warnton)
+
+AC-13 Trigger schließt Dialog
+  Given ein Dialog ist offen
+  When ich den Trigger drücke
+  Then wird der Dialog geschlossen, und es startet keine Ortung
+
+AC-14 Reader-Umschaltung
+  Given der IH45 ist per USB gesteckt
+  When die App einen Reader sucht
+  Then wird der IH45 verbunden (Vorrang vor dem Zebra), und ein grünes Antennen-Icon sowie ein Toast zeigen die Verbindung
 ```
 
 ## 9 Traceability-Matrix
@@ -258,10 +293,12 @@ AC-10 Eine Bildschirmseite
 | O1 Bedienklarheit | FR-06 | AC-02 | `ScanViewModelTest` | `startNewCycleIfNeeded` |
 | O2/O3 Nachvollziehbarkeit | FR-07, FR-08, BR-05 | AC-03, AC-04 | `ScanViewModelTest` (Persistenz), manuell (CSV) | `MismatchRepository` |
 | O2 Prozessstabilität | NFR-04, NFR-06 | AC-05 | Negativtests, `MigrationTest` | Parser, Room |
-| O4 Duplikate finden | FR-10…FR-16, FR-19 | AC-06 | `DuplicateSearchViewModelTest`, `Gs1LocateTargetTest`, Hardware | `DuplicateSearch*`, `ZebraRfd8500Gateway` |
+| O4 Duplikate finden | FR-10…FR-16, FR-19 | AC-06 | `DuplicateSearchViewModelTest`, `Gs1LocateTargetTest`, Hardware | `DuplicateSearch*`, `ZebraRfd8500Gateway`, `HoneywellIh45Gateway` |
 | O4 Wiederfunde belegen | FR-17, BR-07, BR-08 | AC-07, AC-08 | `DuplicateSearchRepositoryTest`, `MigrationTest` | `DuplicateSearchRepository`, `MIGRATION_7_8` |
 | Robustheit | FR-21, NFR-11 | AC-09 | `DuplicateSearchViewModelTest`, `ScanViewModelTest`, Hardware | `TriggerModeArbiter`, `ScanViewModel.setSuspended` |
 | Bedienbarkeit am Handheld | FR-18, NFR-07 | AC-10 | `DuplicateSearchScreenLayoutTest`, Anwender-Abnahme | `DuplicateSearchScreen` |
+| O4 Bedienung ohne dritte Hand | FR-23, BR-15 | AC-12, AC-13 | `DuplicateSearchViewModelTest` (Loslassen, Trigger schließt Dialog, Warnton), Hardware | `DuplicateSearchViewModel`, `ProximityFeedback.resultTone` |
+| Zweiter RFID-Reader | FR-09, NFR-09, NFR-12, BR-13, BR-14 | AC-14 | `SwitchingRfidReaderGatewayTest`, `HoneywellIh45GatewayHelpersTest`, Hardware-Abnahme | `SwitchingRfidReaderGateway`, `HoneywellIh45Gateway`, `ReaderConnectionIndicator` |
 
 ## 10 Abweichungen Ist ↔ frühere Dokumentation
 
@@ -273,3 +310,5 @@ AC-10 Eine Bildschirmseite
 | Drawer: Scan, Export, Reader, Language, About | Dashboard, Find duplicates, Reader, Language, About |
 | Manuelle GTIN-Eingabe (FR-02) | entfernt (2026-10-01) |
 | QCC-Ziel „kein Scan ohne Hardware“ | unverändert; zusätzlich Isolation zwischen Use Cases (FR-21) |
+| „Betrieb mit CT37 + RFD8500“ | seit 2026-10-01 alternativ CT37 + IH45 (USB) |
+| Meldung „Kein Zebra-Reader gefunden“ | „Kein RFID-Reader gefunden“ |

@@ -22,7 +22,7 @@ import de.ca.qcc.data.repository.MismatchRepository
 import de.ca.qcc.device.honeywell.BarcodeScannerGateway
 import de.ca.qcc.device.honeywell.HoneywellCt37ScannerGateway
 import de.ca.qcc.device.zebra.RfidReaderGateway
-import de.ca.qcc.device.zebra.ZebraRfd8500Gateway
+import de.ca.qcc.device.zebra.SwitchingRfidReaderGateway
 import de.ca.qcc.feature.duplicates.ProximityFeedback
 import de.ca.qcc.feature.duplicates.ToneProximityFeedback
 import javax.inject.Singleton
@@ -58,7 +58,7 @@ abstract class GatewayModule {
 
     @Binds
     @Singleton
-    abstract fun bindRfidReader(impl: ZebraRfd8500Gateway): RfidReaderGateway
+    abstract fun bindRfidReader(impl: SwitchingRfidReaderGateway): RfidReaderGateway
 
     @Binds
     abstract fun bindProximityFeedback(impl: ToneProximityFeedback): ProximityFeedback

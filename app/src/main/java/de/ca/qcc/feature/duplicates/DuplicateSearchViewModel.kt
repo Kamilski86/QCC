@@ -24,6 +24,11 @@ import javax.inject.Inject
 
 enum class DuplicatePhase { TARGET, SEARCH }
 
+// Proximity (0..100) from which letting go of the trigger confirms the find, and how long the
+// "tag was at the reader" state stays valid after the proximity dropped again
+const val CONFIRM_PROXIMITY = 95
+private const val AT_TAG_GRACE_MS = 600L
+
 // Everything except plain success feedback is shown as a dialog the user must dismiss,
 // so a warning or error cannot be overlooked
 val DuplicateMessage.requiresAcknowledgement: Boolean
@@ -84,6 +89,9 @@ class DuplicateSearchViewModel @Inject constructor(
 
     // Once false, late async work must not switch the reader out of QCC mode again
     private var screenActive = true
+
+    // Last time the proximity showed the tag directly at the reader (see onTrigger)
+    @Volatile private var lastAtTagMs = 0L
 
     private val _uiState = MutableStateFlow(DuplicateUiState(store = storePreferences.lastStore))
     val uiState: StateFlow<DuplicateUiState> = _uiState.asStateFlow()
@@ -254,6 +262,7 @@ class DuplicateSearchViewModel @Inject constructor(
                 onFailure = { it.toReaderError() }
             )
             _uiState.update { it.copy(busy = false, message = message) }
+            feedback.resultTone(message is DuplicateMessage.Saved)
             // A pending dialog holds locating back until it is dismissed
             if (_uiState.value.continuous && !message.requiresAcknowledgement) startLocating()
         }
@@ -311,22 +320,42 @@ class DuplicateSearchViewModel @Inject constructor(
         }
     }
 
+    // Both hands are busy (device and tag), so the trigger does everything:
+    // hold = locate, release with the tag at the reader = confirm the find, press on a dialog = OK
     private fun onTrigger(pressed: Boolean) {
         if (!screenActive) return
         val state = _uiState.value
-        if (state.message?.requiresAcknowledgement == true) return
+        if (state.message?.requiresAcknowledgement == true) {
+            if (pressed) onMessageDismissed()
+            return
+        }
         when (state.phase) {
             DuplicatePhase.TARGET -> if (pressed) captureFromReader()
             DuplicatePhase.SEARCH -> if (!state.continuous && !state.busy) {
-                viewModelScope.launch { if (pressed) startLocating() else stopLocating() }
+                viewModelScope.launch {
+                    if (pressed) {
+                        lastAtTagMs = 0
+                        startLocating()
+                    } else {
+                        // Read before stopLocating() resets the proximity
+                        val atTag = _uiState.value.locating && atTagNow()
+                        lastAtTagMs = 0
+                        stopLocating()
+                        if (atTag) confirmFind()
+                    }
+                }
             }
         }
     }
+
+    // Released within a moment of the tag having been at the reader (moving the device away while letting go)
+    private fun atTagNow() = System.currentTimeMillis() - lastAtTagMs <= AT_TAG_GRACE_MS
 
     private fun onProximity(value: Int) {
         if (!screenActive) return
         if (!_uiState.value.locating) return
         val proximity = value.coerceIn(0, 100)
+        if (proximity >= CONFIRM_PROXIMITY) lastAtTagMs = System.currentTimeMillis()
         _uiState.update { it.copy(proximity = proximity) }
         feedback.update(proximity)
     }

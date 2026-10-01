@@ -44,7 +44,7 @@ QCC reduziert Fehlzuordnungen zwischen physischem RFID-Tag und gedruckter Kennze
 | Schnellere Prüfung | kürzere Zeit je Artikel | ein Trigger-Druck löst QR- und RFID-Lesung aus; Reihenfolge egal |
 | Revisionsfähigkeit | belegbare Prüfhistorie | jeder Vergleich in `scans`, Mismatches zusätzlich in `mismatches`, CSV-Export |
 | Transparenz für die Schichtsteuerung | Tagesleistung sichtbar | Zähler „Scans heute“ / „Mismatches heute“ |
-| Gezielte Beseitigung doppelter EPCs | Duplikate einzeln auffindbar statt Massen-Sichtung | Nähe-Ortung (Tacho, Beep, Vibration) mit RFD8500 |
+| Gezielte Beseitigung doppelter EPCs | Duplikate einzeln auffindbar statt Massen-Sichtung | Nähe-Ortung (Tacho, Beep, Vibration) mit RFD8500 oder IH45; Bestätigung durch Loslassen des Triggers am Tag |
 | Belegbare Reklamation | lückenlose Liste der Fundstücke | je Fund TID + Zeit + Filiale in der CSV; Wiederfunde mit Datum des Vorfunds |
 | Wenig Schulungsaufwand | schnelle Einarbeitung | wenige Bildschirme, durchgängig weiße Karten/schwarze Buttons |
 
@@ -79,9 +79,9 @@ QCC reduziert Fehlzuordnungen zwischen physischem RFID-Tag und gedruckter Kennze
 ### Im Scope (Ist, Version 0.1.0)
 - QR-Scan, RFID-Scan, automatischer Vergleich, Ergebnisrückmeldung (Anzeige, Ton, Vibration), Reihenfolgefreiheit, Zyklus-Clearing
 - Lokale Persistenz (Room), Tageszähler, CSV-Export aller Scans
-- Reader-Verbindung (Auto-Connect, Reconnect, Status)
+- Reader-Verbindung (Auto-Connect, Reconnect, Status) für Zebra RFD8500 (Bluetooth) und Honeywell IH45 (USB, mit automatischer Umschaltung); Verbindungsanzeige (Icon, Toast)
 - Duplikatsuche: Zielvorgabe (Anlesen, EPC, SGTIN), Ortung, TID-Erfassung, Wiederfunde, CSV-Export
-- Mehrsprachige Oberfläche (EN/DE/PL-Ressourcen)
+- Mehrsprachige Oberfläche (EN/DE-Ressourcen; Polnisch wurde am 2026-10-01 entfernt)
 
 ### Nicht im Scope (derzeit)
 - SSCC-Parsing (AI 00), Mehr-Tag-Inventur, EPCIS 2.0 / Online-Kommunikation („Inbound Read“, geplant, Seite 13)
@@ -91,8 +91,8 @@ QCC reduziert Fehlzuordnungen zwischen physischem RFID-Tag und gedruckter Kennze
 
 ## 8 Annahmen und Randbedingungen
 
-- Betrieb ausschließlich mit **Honeywell CT37 + Zebra RFD8500**; es gibt kein Emulator-Ziel.
-- Die RFD8500 liefert die Trigger-Ereignisse (Pistolengriff); ohne verbundenen Reader funktioniert der Hauptprozess nicht (daher entfielen die manuellen Scan-Buttons im Dashboard).
+- Betrieb ausschließlich mit **Honeywell CT37 + Zebra RFD8500 (Bluetooth) oder Honeywell IH45 (USB)**; es gibt kein Emulator-Ziel.
+- Der angeschlossene RFID-Reader (RFD8500 oder IH45) liefert die Trigger-Ereignisse (Pistolengriff); ohne verbundenen Reader funktioniert der Hauptprozess nicht (daher entfielen die manuellen Scan-Buttons im Dashboard).
 - Die App ist **offline**; alle Daten liegen lokal auf dem Gerät.
 - Das Unternehmen nutzt derzeit einen **7-stelligen GS1 Company Prefix**. Der Vergleich ist davon unabhängig (GTIN-14 + Seriennummer); nur die angezeigte „QR SGTIN“ unterstellt 7 Stellen für die Punktsetzung.
 - Echter Duplikat-EPC aus dem Test: `3034F8242800C10300000011` (Filterwert 1, Partition 5).

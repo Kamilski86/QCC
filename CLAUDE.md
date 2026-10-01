@@ -26,7 +26,7 @@ This is an Android project built with Gradle. All commands run from the repo roo
 ./gradlew clean
 ```
 
-There is no emulator target — the app requires physical Honeywell CT37 (barcode) and Zebra RFD8500 (RFID) hardware. There are no instrumented tests currently. Unit tests use Robolectric + in-memory Room (see `app/src/test/.../testutil`). `./gradlew lintDebug` currently crashes in this environment with "Exception occurred when reading Kotlin metadata" (also on the pre-feature baseline commit 499466a) — known issue, not caused by the duplicate finder.
+There is no emulator target — the app requires physical Honeywell CT37 (barcode) and an RFID reader: Zebra RFD8500 (Bluetooth) or Honeywell IH45 (USB). With the IH45 plugged in the CT37's USB port is taken, so use Wi-Fi adb (`adb tcpip 5555`, `adb connect <IP>:5555`). There are no instrumented tests currently. Unit tests use Robolectric + in-memory Room (see `app/src/test/.../testutil`); 118 tests currently. The IH45 gateway itself needs the SDK and is only covered on hardware (helpers and the switching gateway have unit tests). `./gradlew lintDebug` currently crashes in this environment with "Exception occurred when reading Kotlin metadata" (also on the pre-feature baseline commit 499466a) — known issue, not caused by the duplicate finder.
 
 ## Documentation
 
@@ -43,26 +43,31 @@ app/                     — Activity, Hilt entry point, NavHost, drawer
 navigation/              — Screen sealed class (route definitions)
 feature/{name}/          — Screen composable + ViewModel per use case
 feature/duplicates/      — Duplicate finder: screen + ViewModel + proximity feedback (tone/vibration, gauge)
+feature/diagnostics/     — TEMPORARY IH45 hardware probe (English literals only; remove once the IH45 is accepted)
 domain/model/            — Shared data classes (Models.kt, all @Serializable)
 domain/usecase/          — Business logic (UseCases.kt)
 data/local/              — Room: Entities, Daos, Migrations, AppDatabase
 data/repository/         — MismatchRepository (bridges Room + CSV export), DuplicateSearchRepository
 data/export/             — CsvDocumentWriter (shared CSV file writer)
-device/honeywell/        — HoneywellCt37ScannerGateway (barcode, via AIDC SDK AAR)
-device/zebra/            — ZebraRfd8500Gateway + RfidReaderGateway interface (RFID, via Zebra SDK AAR)
+device/honeywell/        — HoneywellCt37ScannerGateway (barcode, AIDC SDK AAR), HoneywellIh45Gateway (RFID over USB, Honeywell RFID SDK AAR)
+device/zebra/            — ZebraRfd8500Gateway + RfidReaderGateway interface (RFID, via Zebra SDK AAR) + SwitchingRfidReaderGateway (picks IH45 or Zebra)
 core/gs1/                — Gs1ParserService (GS1/EPC parsing, pure Kotlin, no Android deps)
 di/                      — AppModule + GatewayModule (Hilt @Singleton bindings)
 ```
 
-Vendor SDKs (Honeywell AIDC, Zebra RFID) are local AARs in `app/libs/` and `vendor/zebra/` — not on Maven.
+Vendor SDKs (Honeywell AIDC, Zebra RFID, Honeywell RFID for the IH45) are local AARs in `app/libs/`, `vendor/zebra/` and `vendor/honeywell/` — not on Maven. Zebra's `API3_LLRP*` is excluded in `app/build.gradle.kts` (its obfuscated class `a.a` collides with the Honeywell SDK; LLRP is only for network readers). `proguard-rules.pro` keeps the Honeywell SDK packages (JNI is bound to class names); the release build with the IH45 is not yet tested on a device.
 
 ### Key architectural decisions
 
 **ViewModels are scoped at NavHost level in MainActivity**, not per-destination. `ScanViewModel`, `DashboardViewModel`, and `ExportViewModel` are all created via `hiltViewModel()` at the top-level composable and passed down as state/callbacks. This means they live for the full activity lifetime. Any future use-case screens should scope their own ViewModels to their composable destination instead.
 
-**Hardware gateways are @Singleton.** `ZebraRfd8500Gateway` auto-connects to the first discovered Bluetooth reader in `ScanViewModel.init{}`. `HoneywellCt37ScannerGateway` is lifecycle-managed directly in `MainActivity` (`onResume`/`onPause`/`onDestroy` → `claim`/`release`/`close`). Both gateways emit results as `Flow` — hardware events arrive on SDK threads and are emitted via `MutableSharedFlow.tryEmit()`.
+**Hardware gateways are @Singleton.** `RfidReaderGateway` is bound to `SwitchingRfidReaderGateway` (in `GatewayModule`), which keeps exactly one reader connected: the IH45 while it is plugged in via USB, otherwise the Zebra RFD8500. All flows follow the active reader; USB attach/detach re-selects and reconnects, and trigger-mode calls go to both. `ScanViewModel.init{}` auto-connects to the first discovered reader (IH45 listed first). `HoneywellCt37ScannerGateway` is lifecycle-managed directly in `MainActivity` (`onResume`/`onPause`/`onDestroy` → `claim`/`release`/`close`). Both gateways emit results as `Flow` — hardware events arrive on SDK threads and are emitted via `MutableSharedFlow.tryEmit()`.
 
 **Zebra gateway is single-tag mode by design.** `ZebraRfd8500Gateway` uses an `AtomicBoolean inventoryActive` to emit exactly one EPC per inventory session, then stops immediately. This is intentional for the QCC use case (one item at a time). A multi-tag collection mode does not exist yet. The gateway also has trigger modes (`TriggerMode`: QCC / CAPTURE / LOCATE); only QCC runs the single-tag inventory and emits `observeTriggerEvents()`, so `ScanViewModel` is unchanged. CAPTURE/LOCATE (duplicate finder) use `observeHandheldTrigger()`, `TagLocationing`, and nearby reads (`readEpcsNearby`, `readTidsNearby`) at 5 % of the power table (verified on hardware); the TID is read with 96 bit. Hardware finding: the RFD8500 accepts only locate masks that are contiguous from the MSB, so locating is always exact (`LocateTarget.FULL_MASK`); typed SGTINs use a selectable filter value (default 1). `setTriggerMode(QCC)` stops an active locate. Non-QCC screens must claim the trigger via `claimTriggerMode(owner, mode)` / `releaseTriggerMode(owner)` (`TriggerModeArbiter`): only the latest owner can hand it back to QCC, so a late-torn-down screen cannot reset a newer one. While the duplicate finder is on screen, `ScanViewModel.setSuspended(true)` makes QCC ignore scanner events.
+
+**Honeywell IH45 gateway** (`HoneywellIh45Gateway`): connects over USB (`connect(UsbPort)` → `onDeviceConnected` → `createReader`), SDK trigger mode stays RFID (BARCODE mode delivers no trigger events and mutes the CT37 scanner); the QR scan is still started by software. It always runs at full power (30 dBm); `setPower` is a no-op and the level slider only affects the Zebra. A low power does not limit the range on the IH45, so tags are chosen by RSSI: QCC takes the strongest tag (RSSI >= -50 dBm, 400 ms window); capture/confirm count tags >= -50 dBm within 5 dB of the strongest (700 ms). Locating uses the RSSI of the wanted EPC with power steps (0 = full, 1 = 10 dBm, 2 = 5 dBm) because the RSSI saturates in the near field; only step 0 reads the TID. See docs/confluence page 07 §3a and ADR-20. Log tags: `QccIh45`, `QccCt37`, `QccZebra`, `QccIh45Probe`.
+
+**Duplicate finder trigger handling (both readers):** hold = locate; release at the tag (proximity >= 95 % within the last 600 ms) confirms the find; a trigger press dismisses dialogs; `ProximityFeedback.resultTone(success)` plays a bright tone on a saved find, a warning tone otherwise (ADR-21).
 
 **GS1 parsing is fully in `Gs1ParserService`.** It handles:
 - GS1 DataMatrix QR codes (`/01/{GTIN-14}/21/{serial}`) → `QrScanResult`
@@ -73,7 +78,7 @@ SSCC (Application Identifier `00`, 18 digits) parsing does **not** exist yet.
 
 ### Navigation
 
-Routes are defined in `navigation/Nav.kt` as a sealed class. Hard-coded string routes (`"reader"`, `"language"`, `"about"`) are also used directly in `MainActivity`. The Dashboard has Reset, Export and a "Find duplicates" button (no manual QR/RFID scan buttons — scanning is always via the gun trigger). The app currently goes `Splash → Dashboard` with a `ModalNavigationDrawer` providing access to settings screens and the duplicate finder (route `"duplicates"`). Its `DuplicateSearchViewModel` is destination-scoped (the model for future use-case screens); `onScreenStopped()` on ON_STOP/dispose resets the trigger mode to QCC. The keyboard mode is switched to ADJUST_RESIZE only while this screen is active (otherwise ADJUST_NOTHING).
+Routes are defined in `navigation/Nav.kt` as a sealed class. Hard-coded string routes (`"reader"`, `"language"`, `"about"`) are also used directly in `MainActivity`. The Dashboard has Reset, Export and a "Find duplicates" button (no manual QR/RFID scan buttons — scanning is always via the gun trigger). The app currently goes `Splash → Dashboard` with a `ModalNavigationDrawer` providing access to settings screens, the duplicate finder (route `"duplicates"`) and the temporary "IH45 diagnostics" (route `ih45diag`, `Screen.Ih45Diagnostics`; it opens a second `RfidManager` listener, so don't use it together with normal operation). `ReaderConnectionIndicator` in `MainActivity` shows a green antenna icon top right on every screen except Splash while an RFID reader is connected, plus a toast on connect/disconnect. Its `DuplicateSearchViewModel` is destination-scoped (the model for future use-case screens); `onScreenStopped()` on ON_STOP/dispose resets the trigger mode to QCC. The keyboard mode is switched to ADJUST_RESIZE only while this screen is active (otherwise ADJUST_NOTHING).
 
 ### Database
 

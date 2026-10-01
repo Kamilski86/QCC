@@ -1,6 +1,7 @@
 package de.ca.qcc.device.honeywell
 
 import android.content.Context
+import android.util.Log
 import com.honeywell.aidc.AidcManager
 import com.honeywell.aidc.BarcodeFailureEvent
 import com.honeywell.aidc.BarcodeReadEvent
@@ -58,7 +59,9 @@ class HoneywellCt37ScannerGateway @Inject constructor(
     override fun observeScans(): Flow<String> = scanFlow.asSharedFlow()
 
     override suspend fun triggerScan() {
-        val reader = barcodeReader ?: throw IllegalStateException("Scanner nicht verfügbar")
+        val reader = barcodeReader
+        Log.d(TAG, "triggerScan (reader=${reader != null})")
+        reader ?: throw IllegalStateException("Scanner nicht verfügbar")
         reader.aim(true)
         reader.light(true)
         reader.decode(true)
@@ -97,6 +100,7 @@ class HoneywellCt37ScannerGateway @Inject constructor(
 
     // Barcode decoded → stop scanner, emit data
     override fun onBarcodeEvent(event: BarcodeReadEvent) {
+        Log.d(TAG, "barcode read: ${event.barcodeData?.take(40)}")
         runCatching {
             barcodeReader?.aim(false)
             barcodeReader?.light(false)
@@ -105,5 +109,9 @@ class HoneywellCt37ScannerGateway @Inject constructor(
         event.barcodeData?.takeIf { it.isNotBlank() }?.let { scanFlow.tryEmit(it) }
     }
 
-    override fun onFailureEvent(event: BarcodeFailureEvent) {}
+    override fun onFailureEvent(event: BarcodeFailureEvent) { Log.d(TAG, "barcode failure") }
+
+    private companion object {
+        const val TAG = "QccCt37"
+    }
 }

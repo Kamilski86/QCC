@@ -254,7 +254,7 @@ class ScanViewModel @Inject constructor(
                 val readers = rfidReader.discoverReaders()
 
                 if (readers.isEmpty()) {
-                    throw IllegalStateException("Kein Zebra-Reader gefunden")
+                    throw IllegalStateException("Kein RFID-Reader gefunden")
                 }
 
                 rfidReader.connect(readers.first()).getOrThrow()

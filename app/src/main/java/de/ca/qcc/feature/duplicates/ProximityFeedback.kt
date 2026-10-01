@@ -23,6 +23,9 @@ interface ProximityFeedback {
     fun update(proximity: Int)
     fun stop()
     fun release()
+
+    // Result of a confirmed find: distinct from the proximity beeps so it is noticed without looking
+    fun resultTone(success: Boolean) = Unit
 }
 
 // Pause between beeps: silent at 0, 1000 ms at 1 %, 80 ms at 100 %
@@ -57,6 +60,21 @@ class ToneProximityFeedback @Inject constructor(
         loop?.cancel()
         loop = null
         proximity = 0
+    }
+
+    override fun resultTone(success: Boolean) {
+        if (released) return
+        scope.launch {
+            val generator = runCatching { ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100) }.getOrNull()
+            runCatching {
+                generator?.startTone(if (success) ToneGenerator.TONE_PROP_ACK else ToneGenerator.TONE_PROP_NACK, RESULT_TONE_MS)
+            }
+            runCatching {
+                vibrator?.vibrate(VibrationEffect.createOneShot(RESULT_VIBRATE_MS, VibrationEffect.DEFAULT_AMPLITUDE))
+            }
+            delay(RESULT_TONE_MS + 100L)
+            generator?.release()
+        }
     }
 
     @Synchronized
@@ -104,5 +122,7 @@ class ToneProximityFeedback @Inject constructor(
     private companion object {
         const val BEEP_MS = 40
         const val VIBRATE_MS = 25L
+        const val RESULT_TONE_MS = 300
+        const val RESULT_VIBRATE_MS = 150L
     }
 }

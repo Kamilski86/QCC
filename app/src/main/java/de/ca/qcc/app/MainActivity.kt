@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
@@ -37,6 +39,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,8 +72,11 @@ import de.ca.qcc.feature.export.ExportViewModel
 import de.ca.qcc.feature.language.LanguageScreen
 import de.ca.qcc.feature.reader.ReaderConfigScreen
 import de.ca.qcc.feature.scan.ScanViewModel
+import de.ca.qcc.feature.diagnostics.Ih45DiagnosticScreen
 import de.ca.qcc.navigation.Screen
 import de.ca.qcc.ui.theme.QccTheme
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -91,7 +99,15 @@ class MainActivity : AppCompatActivity() {
         }
 
     private fun ensureBluetoothPermissions() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            // Android 10/11: Bluetooth discovery (IH45 diagnostics) needs the location permission
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                bluetoothPermissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION))
+            }
+            return
+        }
 
         val connectGranted = ContextCompat.checkSelfPermission(
             this, Manifest.permission.BLUETOOTH_CONNECT
@@ -209,6 +225,15 @@ private fun AppNav() {
                         }
                     )
                     DrawerItem(
+                        label = "IH45 diagnostics",
+                        icon = Icons.Default.SettingsInputAntenna,
+                        selected = currentRoute == Screen.Ih45Diagnostics.route,
+                        onClick = {
+                            navController.navigate(Screen.Ih45Diagnostics.route)
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+                    DrawerItem(
                         label = stringResource(R.string.about),
                         icon = Icons.Default.Info,
                         selected = currentRoute == Screen.About.route,
@@ -221,6 +246,7 @@ private fun AppNav() {
             }
         }
     ) {
+        Box(Modifier.fillMaxSize()) {
         NavHost(navController = navController, startDestination = Screen.Splash.route) {
             composable(Screen.Splash.route) {
                 LaunchedEffect(Unit) {
@@ -330,10 +356,49 @@ private fun AppNav() {
                 LanguageScreen(onOpenDrawer = { scope.launch { drawerState.open() } })
             }
 
+            composable(Screen.Ih45Diagnostics.route) {
+                Ih45DiagnosticScreen(onOpenDrawer = { scope.launch { drawerState.open() } })
+            }
+
             composable(Screen.About.route) {
                 AboutScreen(onOpenDrawer = { scope.launch { drawerState.open() } })
             }
         }
+        if (currentRoute != Screen.Splash.route) {
+            ReaderConnectionIndicator(scanViewModel, Modifier.align(Alignment.TopEnd))
+        }
+        }
+    }
+}
+
+// Shows at a glance (top right, over every screen's app bar) that an RFID reader is connected, and
+// tells the user when it connects or drops, so nobody has to open the reader settings to check
+@Composable
+private fun ReaderConnectionIndicator(scanViewModel: ScanViewModel, modifier: Modifier = Modifier) {
+    val status by scanViewModel.uiState.map { it.readerStatus }.distinctUntilChanged()
+        .collectAsState(initial = scanViewModel.uiState.value.readerStatus)
+    val context = LocalContext.current
+    var wasConnected by remember { mutableStateOf<Boolean?>(null) }
+
+    LaunchedEffect(status.isConnected) {
+        val previous = wasConnected
+        wasConnected = status.isConnected
+        if (previous == null || previous == status.isConnected) return@LaunchedEffect
+        val message = if (status.isConnected) {
+            context.getString(R.string.reader_connected_toast, status.readerName ?: context.getString(R.string.reader))
+        } else {
+            context.getString(R.string.reader_disconnected_toast)
+        }
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    if (status.isConnected) {
+        Icon(
+            imageVector = Icons.Default.SettingsInputAntenna,
+            contentDescription = stringResource(R.string.reader_connected_icon, status.readerName ?: ""),
+            tint = Color(0xFF2E7D32),
+            modifier = modifier.statusBarsPadding().padding(top = 20.dp, end = 16.dp).size(24.dp)
+        )
     }
 }
 
