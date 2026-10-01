@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Stand** | 2026-10-01 |
-| **Testbestand** | **98 Tests**, alle grün (`./gradlew :app:testDebugUnitTest`) |
+| **Testbestand** | **96 Tests**, alle grün (`./gradlew :app:testDebugUnitTest`) |
 | **Quellen** | `app/src/test/`, Anforderungen (Seite 03) |
 
 ## 1 Teststrategie
@@ -24,15 +24,15 @@ Nicht automatisiert getestet: `ZebraRfd8500Gateway`, `HoneywellCt37ScannerGatewa
 | Testklasse | Tests | Schwerpunkt |
 |---|---|---|
 | `core/gs1/Gs1ParserServiceTest` | 1 | Parser-Grundfall |
-| `core/gs1/Gs1ParserServiceTest2` | 5 | EPC/QR-Parsing, Negativfälle |
+| `core/gs1/Gs1ParserServiceTest2` | 4 | EPC/QR-Parsing, Negativfälle |
 | `core/gs1/Gs1LocateTargetTest` | 17 | SGTIN→EPC (Filter 0–7, Partitionen, Rundlauf), Eingabeerkennung, Validierung |
-| `feature/scan/ScanViewModelTest` | 6 | Reihenfolgefreiheit, Zyklus-Clearing (Hardware-Pfad), Persistenz Match/Mismatch, manuelle GTIN, ungültiger EPC, **Suspendierung** |
+| `feature/scan/ScanViewModelTest` | 5 | Reihenfolgefreiheit, Zyklus-Clearing (Hardware-Pfad), Persistenz Match/Mismatch, ungültiger EPC, **Suspendierung** |
 | `feature/duplicates/DuplicateSearchViewModelTest` | 43 | Phasen, Live-Auswertung, Start ohne Apply, Trigger-Modi, Ortung, Continuous, Confirm (0/1/n/bekannt/Wiederfund), Dialog-Logik, Trigger-Besitz, Fortsetzen offener Suche, Export, Fehlerpfade |
 | `feature/duplicates/BeepIntervalTest` | 5 | Beep-Kennlinie 1000→80 ms |
 | `feature/duplicates/DuplicateSearchScreenLayoutTest` | 3 | alle Elemente sichtbar ohne Scrollen (360×600 dp), Gauge ≥ 80 dp, TID-Platzhalter „-“ |
 | `data/repository/DuplicateSearchRepositoryTest` | 15 | Nummerierung, Wiederfund + Vorfund-Datum, doppelte TID, offene Suche, `lastTid`, CSV (Inhalt, Escape, „Previously Found“), idempotenter Abschluss, Retry nach Exportfehler |
 | `data/local/MigrationTest` | 3 | 6→7 (Daten bleiben), 7→8 (Constraints, `previousFoundAt`), Cascade |
-| **Summe** | **98** | |
+| **Summe** | **96** | |
 
 Test-Fakes: `FakeDuplicateReader` (inkl. Arbiter-Semantik), `FakeCsvWriter`, `FakeProximityFeedback`, `inMemoryDb`.
 
@@ -41,7 +41,7 @@ Test-Fakes: `FakeDuplicateReader` (inkl. Arbiter-Semantik), `FakeCsvWriter`, `Fa
 | Anforderung | Tests / Nachweis |
 |---|---|
 | FR-01, FR-03 | `Gs1ParserServiceTest*`, `Gs1LocateTargetTest` |
-| FR-02 | `ScanViewModelTest.manualGtinWithoutSerial_…` |
+| FR-02 | entfallen (manuelle GTIN entfernt) |
 | FR-04, FR-05, FR-06 | `ScanViewModelTest` |
 | FR-07, FR-08 | keine Automatisierung (manuell: Dashboard-Zähler, CSV) |
 | FR-09 | manuell |
@@ -80,7 +80,7 @@ Test-Fakes: `FakeDuplicateReader` (inkl. Arbiter-Semantik), `FakeCsvWriter`, `Fa
 | NFT-02 | Reaktionszeit Scan → Rückmeldung | offen |
 | NFT-03 | Recovery nach Bluetooth-Disconnect im Betrieb | teilweise (Logik per Test, Hardware offen) |
 | NFT-04 | Konsistenz der Tageszähler über längere Laufzeit (Datumswechsel) | offen |
-| NFT-05 | Release-Build auf Gerät (R8) | **blockiert** (Build scheitert, Seite 10) |
+| NFT-05 | Release-Build auf Gerät (R8) | teilweise: Build ✅, Start auf CT37 ✅ (Dashboard rendert, kein Absturz, 2026-10-01); **Funktionstest mit Reader/Scan/Export offen** (signierter Release-Build nötig) |
 | NFT-06 | Layout bei größerer Systemschrift / anderen Displays | offen (Gauge skaliert, nicht getestet) |
 
 ## 6 Testdaten
@@ -112,7 +112,7 @@ Freigabe nur, wenn:
 2. keine offenen Blocker/Critical Defects,
 3. Persistenz und Export auf Gerät verifiziert,
 4. Hardware-Smoke-Test auf CT37 + RFD8500 bestanden (Checkliste Abschnitt 4: H-01…H-10),
-5. **Release-Build** (R8) baut und läuft (aktuell nicht erfüllt).
+5. **Release-Build** (R8) baut und läuft auf dem Gerät (Build und Start erfüllt; vollständiger Funktionstest offen).
 
 ## 9 Empfohlene Verbesserungen
 

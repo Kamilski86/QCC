@@ -36,10 +36,8 @@ flowchart LR
 - **Ergebnis:** `QrScanResult(rawValue, gtin, serial, sgtin)`.
 - **Trace:** `Gs1ParserService.parseQr`, `ScanViewModel.handleQr` · **Tests:** `Gs1ParserServiceTest*`, `ScanViewModelTest`.
 
-### FR-02 Manuelle GTIN (Should) 🟡
-- Eingabe einer 14-stelligen GTIN; Seriennummer bleibt `null`; Vergleich ergibt per BR-02 immer `MISMATCH`.
-- **Abweichung:** Logik vorhanden (`parseManualQrGtin`, `ScanViewModel.setManualQrGtin`, Strings `manual_entry_*`), aber **kein UI-Einstieg** im aktuellen Dashboard. → Entscheidung offen (Seite 13).
-- **Tests:** `ScanViewModelTest.manualGtinWithoutSerial_mismatchIsPersisted`.
+### FR-02 Manuelle GTIN (entfallen) ⛔
+Die manuelle Eingabe einer 14-stelligen GTIN (ohne Seriennummer, Vergleich immer `MISMATCH`) hatte im Dashboard keinen UI-Einstieg und wurde am 2026-10-01 **auf Wunsch des Auftraggebers entfernt** (`parseManualQrGtin`, `ScanViewModel.setManualQrGtin`, zugehörige Strings und Tests). Die ID bleibt zur Nachvollziehbarkeit reserviert.
 
 ### FR-03 RFID-Parsing (Must) ✅
 - Eingabe: Hex-String. Regeln: nur Hex-Zeichen, gerade Länge, genau **24 Zeichen** (SGTIN-96), Header `0x30`, Partition 0–6, GTIN ≠ `00000000000000`, Seriennummer ≠ `0000000000`.
@@ -142,7 +140,7 @@ Button **„Find duplicates“** im Dashboard (unter „Export Mismatches (CSV)�
 | NFR-02 | Architektur MVVM, Hilt, Room, Navigation Compose | Strukturreview, Seite 05 | ✅ |
 | NFR-03 | Rückmeldung (Ton/Vibration) unmittelbar nach Scan | manueller Test auf Hardware | 🧪 |
 | NFR-04 | Parse-/Verbindungsfehler als benutzerlesbare Meldung | Negativtests Parser/ViewModel | ✅ (QCC-Meldungen teils deutsch hart codiert) |
-| NFR-05 | UI-Texte in `values`, `values-de`, `values-pl` | Resource-Review | 🟡 (QCC-ViewModel/UseCase-Meldungen und Reader-Status deutsch hart codiert; 8 `MissingTranslation`-Lint-Fehler) |
+| NFR-05 | UI-Texte in `values`, `values-de`, `values-pl` | Resource-Review | 🟡 (QCC-ViewModel/UseCase-Meldungen und Reader-Status deutsch hart codiert; in DE/PL fehlen `match`, `mismatch`, `ok`) |
 | NFR-06 | Robuste lokale Persistenz inkl. verlustfreier Migration (Schema 8) | `MigrationTest` (6→7, 7→8), Repository-Tests | ✅ |
 | NFR-07 | Suchmaske des Duplicate Finders ohne Scrollen auf Handheld-Display | `DuplicateSearchScreenLayoutTest` (360×600 dp, Gauge ≥ 80 dp); Anwender-Abnahme CT37 | ✅🧪 |
 | NFR-08 | Offline-Betrieb (kein Netzwerkzugriff) | Manifest ohne `INTERNET` | ✅ |
@@ -155,7 +153,7 @@ Button **„Find duplicates“** im Dashboard (unter „Export Mismatches (CSV)�
 | ID | Regel |
 |---|---|
 | BR-01 | Vergleich nur, wenn QR **und** RFID vorliegen. |
-| BR-02 | QR ohne Seriennummer ist nicht matchbar → `MISMATCH`. |
+| BR-02 | QR ohne Seriennummer ist nicht matchbar → `MISMATCH` (nur noch als Absicherung; `parseQr` verlangt eine Seriennummer). |
 | BR-03 | EPC muss SGTIN-96-konform sein. |
 | BR-04 | Ein neuer abgeschlossener Zyklus startet mit bereinigten Vorwerten. |
 | BR-05 | Jeder Vergleich erzeugt genau einen `scans`-Datensatz (Mismatch zusätzlich einen `mismatches`-Datensatz). |
@@ -268,4 +266,5 @@ AC-10 Eine Bildschirmseite
 | Dashboard mit Buttons „QR Scan“, „RFID Scan“ | entfernt; Scan nur per Trigger; neu: „Find duplicates“ |
 | FR-09 „Sendeleistung kann angepasst werden“ | nur Anzeige, kein Bedienelement |
 | Drawer: Scan, Export, Reader, Language, About | Dashboard, Find duplicates, Reader, Language, About |
+| Manuelle GTIN-Eingabe (FR-02) | entfernt (2026-10-01) |
 | QCC-Ziel „kein Scan ohne Hardware“ | unverändert; zusätzlich Isolation zwischen Use Cases (FR-21) |

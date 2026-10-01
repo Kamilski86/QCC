@@ -122,7 +122,6 @@ Verletzungen liefern „Reader beschäftigt“. `setTriggerMode(QCC)` stoppt ein
 |---|---|---|
 | `parseQr(raw)` | String → `QrScanResult` | Regex `.*/01/(\d{14})/21/([^/]+).*`; sonst „QR-Code enthält keine erwartete GTIN/Seriennummer-Struktur“ |
 | `buildQrSgtin(gtin, serial)` | → `GCP.ItemRef.Serial` | GTIN 14-stellig; Serial nicht leer; **GCP = 7 Stellen fest** (Stellen 2–8 der GTIN), ItemRef = Indikator + Stellen 9–13; Prüfziffer entfällt |
-| `parseManualQrGtin(gtin)` | 14 Ziffern → `QrScanResult` ohne Serial | sonst „Manuelle GTIN muss genau 14-stellig sein“ |
 | `parseEpcToSgtin(epc)` | 24 Hex → `RfidScanResult` | nur Hex; gerade Länge; genau 24 Zeichen; Header `0x30`; Partition 0–6; GTIN ≠ 0…0; Serial ≠ `0000000000`; Prüfziffer wird berechnet (Gewichte 3/1) |
 | `parseLocateTarget(input, filter)` | EPC (24 Hex) **oder** `Ziffern.Ziffern.Ziffern` → `LocateTarget` | sonst „Eingabe ist weder EPC (24 Hex) noch SGTIN“; ein Hex-EPC trägt seinen Filter selbst |
 | `encodeSgtin96(gcp, itemRef, serial, filter)` | → 24 Hex | GCP 6–12 Stellen; ItemRef-Länge passend zur Partition; Filter 0–7; Serial ohne führende Null (außer `0`) und < 2³⁸ |

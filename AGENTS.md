@@ -56,7 +56,6 @@ All three ViewModels (`ScanViewModel`, `DashboardViewModel`, `ExportViewModel`) 
 ### GS1 Parsing Encapsulation
 `Gs1ParserService` (pure Kotlin, no Android deps) handles:
 - **QR DataMatrix:** `/01/{GTIN-14}/21/{serial}` → `QrScanResult`
-- **Manual GTIN:** 14-digit input → `QrScanResult` (no serial)
 - **SGTIN-96 EPC:** 24 hex chars → `RfidScanResult` (GTIN + serial extracted)
 - **Checksum:** EAN-13 check digit calculation (GTIN validation)
 

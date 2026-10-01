@@ -66,7 +66,6 @@ Vendor SDKs (Honeywell AIDC, Zebra RFID) are local AARs in `app/libs/` and `vend
 
 **GS1 parsing is fully in `Gs1ParserService`.** It handles:
 - GS1 DataMatrix QR codes (`/01/{GTIN-14}/21/{serial}`) → `QrScanResult`
-- Manual 14-digit GTIN → `QrScanResult`  
 - SGTIN-96 EPC hex (24 hex chars) → `RfidScanResult`
 - SGTIN pure identity string construction from GTIN + serial
 

@@ -16,7 +16,7 @@
 | CSV-Exporte | wie oben | öffentlicher Ordner *Documents* | **für andere Apps/Nutzer mit Speicherzugriff lesbar** |
 | Gerätezustand | Reader-Name/Status | Speicher, Logcat | gering |
 
-**Personenbezug:** Die App hat **keine Anmeldung, kein Benutzerkonto und erfasst keine Mitarbeiterkennung**; es werden keine Personendaten gezielt verarbeitet. Eine datenschutzrechtliche Bewertung durch die zuständige Stelle steht aus **[zu bestätigen]**. Die Strings `user_id`, `password`, `login` sind in den Ressourcen vorhanden, aber **ungenutzt** (kein Login-Feature).
+**Personenbezug:** Die App hat **keine Anmeldung, kein Benutzerkonto und erfasst keine Mitarbeiterkennung**; es werden keine Personendaten gezielt verarbeitet. Eine datenschutzrechtliche Bewertung durch die zuständige Stelle steht aus **[zu bestätigen]**. Ein Login-Feature existiert nicht (die früher vorhandenen, ungenutzten Strings `user_id`, `password`, `login` wurden am 2026-10-01 entfernt).
 
 Vertraulichkeit/Integrität/Verfügbarkeit: Schutzbedarf **[zu bestätigen]**. Annahme für die Bewertung unten: normaler Betriebsdatenschutz, keine Geheimhaltungsstufe.
 
@@ -26,8 +26,8 @@ Vertraulichkeit/Integrität/Verfügbarkeit: Schutzbedarf **[zu bestätigen]**. A
 |---|---|---|---|
 | `BLUETOOTH_SCAN`, `BLUETOOTH_CONNECT` | Zebra-Reader finden/verbinden (Laufzeit-Anfrage ab Android 12) | ja | erforderlich. **[Beobachtung]** Für Android 9–11 fehlen die Legacy-Berechtigungen (`BLUETOOTH`, `BLUETOOTH_ADMIN`, Standort); Betrieb dort ungeprüft |
 | `VIBRATE` | Haptik | ja | erforderlich |
-| `POST_NOTIFICATIONS` | – | **nein** (kein Notification-Code) | **[Empfehlung]** entfernen |
-| `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_CONNECTED_DEVICE` | – | **nein** (kein Service) | **[Empfehlung]** entfernen |
+| ~~`POST_NOTIFICATIONS`~~ | – | – | **entfernt am 2026-10-01** (war ungenutzt) |
+| ~~`FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_CONNECTED_DEVICE`~~ | – | – | **entfernt am 2026-10-01** (war ungenutzt) |
 | `INTERNET` | – | nicht deklariert | App ist offline (gewollt); wird für EPCIS (geplant) nötig |
 | Speicher (`WRITE_EXTERNAL_STORAGE`) | CSV auf API 28 | nicht deklariert | MediaStore ab API 29 ohne Berechtigung; API 28 würde scheitern |
 
@@ -52,7 +52,7 @@ Vertraulichkeit/Integrität/Verfügbarkeit: Schutzbedarf **[zu bestätigen]**. A
 | SQL | Room mit parametrisierten Queries; keine String-Konkatenation von Eingaben |
 | CSV | Felder werden RFC-4180-konform escaped (`csvEscape`); **[Beobachtung]** keine Neutralisierung von Formelzeichen (`=`, `+`, `-`, `@`) beim Öffnen in Tabellenkalkulation (CSV-Injection) – relevant nur, wenn QR-Rohdaten von Dritten stammen |
 | Logging | Logcat enthält technische Ereignisse (Moduswechsel, SDK-Fehler), **keine** Scan-Inhalte; Reader-Fehlertexte können Gerätedetails enthalten |
-| Release-Härtung | R8-Minifizierung konfiguriert, aber derzeit nicht baubar (Seite 10); kein Debuggable-Flag explizit gesetzt (Standard: Release nicht debuggable) |
+| Release-Härtung | R8-Minifizierung aktiv und baubar (Seite 10); die Vendor-SDK-Pakete sind bewusst **von der Obfuskation ausgenommen**; Release-Build ist unsigniert; kein Debuggable-Flag explizit gesetzt (Standard: Release nicht debuggable) |
 
 ## 6 Lieferkette
 
@@ -65,7 +65,7 @@ Vertraulichkeit/Integrität/Verfügbarkeit: Schutzbedarf **[zu bestätigen]**. A
 | ID | Risiko | Wahrscheinlichkeit | Auswirkung | Maßnahme |
 |---|---|---|---|---|
 | S-01 | Scan-/Fund-Daten gelangen über Backup oder öffentlichen Ordner an Dritte | mittel | mittel | Backup-Regeln festlegen; Export-Ablage bewerten (z. B. app-spezifischer Ordner/Share-Intent) |
-| S-02 | Überflüssige Berechtigungen vergrößern die Angriffsfläche und sind beim Store-/MDM-Review auffällig | niedrig | niedrig | `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE*` entfernen |
+| S-02 | ~~Überflüssige Berechtigungen~~ | – | – | **erledigt** (2026-10-01): `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE*` entfernt |
 | S-03 | CSV-Injection beim Öffnen exportierter Dateien | niedrig | niedrig–mittel | Formelzeichen am Feldanfang neutralisieren, falls Dritte QR-Inhalte beeinflussen können |
 | S-04 | Manipulierte/ersetzte Vendor-AARs | niedrig | hoch | Prüfsummen dokumentieren, Bezug aus offiziellen Quellen belegen |
 | S-05 | Unbegrenzte Aufbewahrung von Betriebsdaten | mittel | niedrig–mittel | Aufbewahrungs-/Löschkonzept |

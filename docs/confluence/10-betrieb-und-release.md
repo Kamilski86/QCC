@@ -21,12 +21,19 @@ Es gibt keine Backend-Systeme; die App ist offline.
 | Variante | Status | Hinweis |
 |---|---|---|
 | `debug` | ✅ baut, läuft auf CT37 | `applicationId de.ca.qcc`, Schemata als Assets (für Tests) |
-| `release` | ⛔ **Build scheitert** | R8: `Missing class android.os.ServiceManager (referenced from com.zebra.rfid.RfidServiceMgr.<init>())`; `isMinifyEnabled = true`, `proguard-rules.pro` leer, keine Signierung |
+| `release` | ✅ baut (seit 2026-10-01), ⏳ unsigniert | R8 mit `proguard-rules.pro` (Vendor-SDKs bleiben unobfuskiert); Ausgabe `app/build/outputs/apk/release/app-release-unsigned.apk` (ca. 12 MB). Start auf dem CT37 geprüft (Dashboard rendert, kein Absturz); **Funktionstest mit Reader/Scan/Export steht aus** |
 
-**Vor erstem Release erforderlich:**
-1. R8-Regeln für die Vendor-SDKs ergänzen (z. B. `-dontwarn android.os.ServiceManager` und die in `app/build/outputs/mapping/release/missing_rules.txt` vorgeschlagenen Regeln); Keep-Regeln für Zebra-/Honeywell-Reflexion prüfen.
-2. Release-Build auf dem CT37 vollständig durchspielen (Scan, RFID, Duplicate Finder, Export) – Minifizierung kann Hilt/Room/kotlinx-serialization/SDK-Aufrufe beeinflussen.
-3. Signierung einrichten (Keystore außerhalb des Repositories).
+**Release-Build-Konfiguration (erledigt 2026-10-01):** Ursache des früheren Fehlers war ein von Zebras SDK referenziertes, nicht öffentliches Android-Klassenobjekt (`android.os.ServiceManager`). `app/proguard-rules.pro` enthält nun
+1. `-dontwarn android.os.ServiceManager`,
+2. `-keep class com.zebra.** { *; }` und `-keep class com.honeywell.** { *; }` – die Zebra-AARs liefern leere Consumer-Rules, Honeywell bündelt JNI-Bibliotheken (`libhedc.so`), die an Klassennamen gebunden sind; ohne Keep benennt R8 z. B. `RFIDReader` in `a6.u` um,
+3. `-dontwarn` für nicht genutzte Zebra-Transporte (`com.jcraft.jsch`, `fi.iki.elonen`, `org.apache.xerces`, `org.bouncycastle`, `org.java_websocket`).
+
+**Noch erforderlich vor Auslieferung:**
+1. **Signierung** einrichten (Keystore außerhalb des Repositories; Release-Signaturen sind an den Paketnamen gebunden, eine Debug-Signatur eignet sich nicht für die Verteilung).
+2. **Funktionstest des signierten Release-Builds** auf dem CT37 (Reader verbinden, QCC-Scan, Duplicate Finder, CSV-Export), da Minifizierung Hilt/Room/SDK-Aufrufe beeinflussen kann.
+3. Verteilungsweg festlegen (Seite 13, O-04).
+
+> **Parallel-Test des Release-Builds:** Eine Release-Variante mit Debug-Signatur und `applicationIdSuffix ".rel"` lässt sich lokal parallel zur Debug-App installieren (z. B. per Gradle-Init-Skript, ohne das Repository zu ändern). Dabei Reader und Scanner nur von **einer** App gleichzeitig nutzen.
 
 ## 3 Installation und Update
 
@@ -77,6 +84,8 @@ Deinstallation oder „Daten löschen“ entfernt `qcc.db` und die Einstellungen
 - Popups (Dialog mit OK) für Warnungen und Fehler im Duplicate Finder.
 
 **Geändert**
+- **Release-Build** funktioniert (R8-Regeln für die Vendor-SDKs).
+- Manuelle GTIN-Eingabe (ohne UI) sowie 24 ungenutzte Strings, die Permissions `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_CONNECTED_DEVICE` und die Routen `scan`/`export` entfernt.
 - Dashboard: Buttons „QR Scan“ und „RFID Scan“ entfallen (Scan nur per Pistolen-Trigger). „Reset“ und „Export Mismatches (CSV)“ bleiben.
 - Duplicate Finder, Phase 1: „Apply“ und „Read with reader“ entfallen (Eingabe wird direkt ausgewertet; Trigger liest an).
 - Duplicate Finder, Phase 2: eine Bildschirmseite ohne Scrollen; neue TID-Zeile; Kachel „Last“ entfällt.
@@ -89,9 +98,9 @@ Deinstallation oder „Daten löschen“ entfernt `qcc.db` und die Einstellungen
 - Zuletzt gelesene TID ging beim Wiederöffnen einer offenen Suche verloren.
 
 **Bekannte Probleme**
-- Release-Build scheitert an R8 (siehe Abschnitt 2).
+- Release-Build ist unsigniert; Funktionstest des signierten Release-Builds steht aus (siehe Abschnitt 2).
 - Test mit **zwei gleichzeitig gehaltenen Duplikaten** steht aus.
-- Sendeleistung im Reader-Screen nur angezeigt; manuelle GTIN ohne UI; Polnisch nicht in der Sprachauswahl (Seite 13).
+- Sendeleistung im Reader-Screen nur angezeigt („dBm“-Beschriftung irreführend); Polnisch nicht in der Sprachauswahl (Seite 13).
 
 ## 7 Betrieb und Support
 

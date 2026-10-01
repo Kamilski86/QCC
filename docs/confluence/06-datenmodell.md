@@ -122,7 +122,7 @@ Regel: höchstens **eine** offene Suche (`startSearch` schließt eine offene Vor
 
 | Klasse | Felder | Zweck |
 |---|---|---|
-| `QrScanResult` | `rawValue`, `gtin`, `serial?`, `sgtin?` | geparster QR / manuelle GTIN (ohne Serial) |
+| `QrScanResult` | `rawValue`, `gtin`, `serial?`, `sgtin?` | geparster QR (`serial` ist nach Wegfall der manuellen GTIN immer gesetzt; Typ blieb nullable) |
 | `RfidScanResult` | `epc`, `sgtin`, `gtin`, `scannedAt`, `readerName?`, `readerBattery?` | geparster SGTIN-96-EPC |
 | `ComparisonStatus` | `IDLE`, `MATCH`, `MISMATCH`, `ERROR` | Zyklusstatus (`ERROR` wird derzeit nicht vergeben) |
 | `ComparisonResult` | `status`, `gtinQr?`, `gtinTag?`, `message`, `comparedAt` | Vergleichsergebnis |

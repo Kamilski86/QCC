@@ -52,8 +52,8 @@ Mehrere Geräte: `ANDROID_SERIAL=<seriennummer> ./gradlew installDebug`; Geräte
 |---|---|
 | `./gradlew lintDebug` stürzt ab | „Exception occurred when reading Kotlin metadata“ – auch auf dem Baseline-Commit `499466a`; nicht durch Feature-Arbeit verursacht |
 | Lint-Befunde | 8 alte `MissingTranslation`-Fehler (z. B. `cancel`, `actions`, …) unbehoben |
-| **`assembleRelease` scheitert** | R8: `Missing class android.os.ServiceManager (referenced from com.zebra.rfid.RfidServiceMgr.<init>())`. `proguard-rules.pro` ist leer. Vor einer Auslieferung sind `-dontwarn`-/Keep-Regeln für die Vendor-SDKs (und Prüfung für Hilt/Room/Serialization) nötig; Vorschlag: die in `app/build/outputs/mapping/release/missing_rules.txt` erzeugten Regeln prüfen und übernehmen |
-| Keine Signaturkonfiguration | `release` hat kein `signingConfig` |
+| `assembleRelease` | **behoben (2026-10-01)**: `app/proguard-rules.pro` hält `com.zebra.**` und `com.honeywell.**` unobfuskiert (Honeywell bündelt JNI-Bibliotheken) und unterdrückt Warnungen für nicht genutzte Zebra-Transporte (JSch, NanoHTTPD, Xerces, BouncyCastle, WebSocket). Die Datei ist jetzt **Pflichtbestandteil** des Release-Builds. Ergebnis: unsigniertes `app-release-unsigned.apk` (ca. 12 MB) |
+| Keine Signaturkonfiguration | `release` hat kein `signingConfig`; das APK ist **unsigniert** und nicht installierbar, bis signiert wird (Seite 10) |
 
 ## 4 Projektstruktur
 
