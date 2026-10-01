@@ -87,3 +87,15 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_duplicate_finds_searchId` ON `duplicate_finds` (`searchId`)")
     }
 }
+
+// A TID may be found again in a later search (a tag put back on the table): uniqueness now
+// applies per search, and a find remembers when the same TID was found before.
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("DROP INDEX IF EXISTS `index_duplicate_finds_tid`")
+        db.execSQL("DROP INDEX IF EXISTS `index_duplicate_finds_searchId`")
+        db.execSQL("ALTER TABLE `duplicate_finds` ADD COLUMN `previousFoundAt` INTEGER")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_duplicate_finds_searchId_tid` ON `duplicate_finds` (`searchId`, `tid`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_duplicate_finds_tid` ON `duplicate_finds` (`tid`)")
+    }
+}

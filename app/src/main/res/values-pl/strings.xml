@@ -71,7 +71,13 @@
     <string name="dup_confirm_find">Potwierdź znalezisko</string>
     <string name="dup_end_search">Zakończ wyszukiwanie</string>
     <string name="dup_msg_saved">Znalezisko #%1$d zapisane – usuń artykuł</string>
-    <string name="dup_msg_already_found">Już znaleziono (#%1$d)</string>
+    <string name="dup_msg_already_found">Już policzono w tym wyszukiwaniu jako znalezisko #%1$d (%3$s).
+TID: %2$s</string>
+    <string name="dup_msg_saved_again">Policzono jako znalezisko #%1$d.
+Ten tag znaleziono już %3$s.
+TID: %2$s</string>
+    <string name="dup_dialog_title_already">Już znaleziono</string>
+    <string name="dup_dialog_title_again">Znaleziono ponownie</string>
     <string name="dup_msg_no_tag">Brak duplikatu przy czytniku – zły artykuł?</string>
     <string name="dup_msg_multiple">Wykryto kilka duplikatów – odizoluj artykuł</string>
     <string name="dup_msg_capture_none">Nie wykryto tagu – przyłóż artykuł bezpośrednio do czytnika</string>

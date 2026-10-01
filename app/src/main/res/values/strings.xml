@@ -80,7 +80,13 @@
     <string name="dup_confirm_find">Confirm find</string>
     <string name="dup_end_search">End search</string>
     <string name="dup_msg_saved">Find #%1$d saved – remove the item</string>
-    <string name="dup_msg_already_found">Already found (#%1$d)</string>
+    <string name="dup_msg_already_found">Already counted in this search as find #%1$d (%3$s).
+TID: %2$s</string>
+    <string name="dup_msg_saved_again">Counted as find #%1$d.
+This tag was already found on %3$s.
+TID: %2$s</string>
+    <string name="dup_dialog_title_already">Already found</string>
+    <string name="dup_dialog_title_again">Found again</string>
     <string name="dup_msg_no_tag">No duplicate at the reader – wrong item?</string>
     <string name="dup_msg_multiple">Several duplicates detected – isolate the item</string>
     <string name="dup_msg_capture_none">No tag detected – hold the item directly to the reader</string>

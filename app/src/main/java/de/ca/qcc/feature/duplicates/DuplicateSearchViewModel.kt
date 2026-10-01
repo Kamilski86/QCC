@@ -24,10 +24,19 @@ import javax.inject.Inject
 
 enum class DuplicatePhase { TARGET, SEARCH }
 
+// Shown as a dialog the user must dismiss, so it cannot be overlooked
+val DuplicateMessage.requiresAcknowledgement: Boolean
+    get() = this is DuplicateMessage.SavedAgain || this is DuplicateMessage.AlreadyFound
+
 // Typed so the UI can localize; the ViewModel never builds user-visible text
 sealed interface DuplicateMessage {
     data class Saved(val findNo: Int) : DuplicateMessage
-    data class AlreadyFound(val findNo: Int) : DuplicateMessage
+
+    // Counted, but the tag was already found before (e.g. put back on the table by someone)
+    data class SavedAgain(val findNo: Int, val tid: String, val previousFoundAt: Long) : DuplicateMessage
+
+    // Same tag twice in one search: not counted again
+    data class AlreadyFound(val findNo: Int, val tid: String, val foundAt: Long) : DuplicateMessage
     data object NoTagAtReader : DuplicateMessage
     data object MultipleTags : DuplicateMessage
     data object CaptureNoTag : DuplicateMessage
@@ -104,7 +113,8 @@ class DuplicateSearchViewModel @Inject constructor(
                         target = open.target,
                         store = open.store.orEmpty(),
                         searchId = open.id,
-                        foundCount = open.foundCount
+                        foundCount = open.foundCount,
+                        lastTid = open.lastTid
                     )
                 }
             }
@@ -236,8 +246,15 @@ class DuplicateSearchViewModel @Inject constructor(
                 onFailure = { it.toReaderError() }
             )
             _uiState.update { it.copy(busy = false, message = message) }
-            if (_uiState.value.continuous) startLocating()
+            // A pending dialog holds locating back until it is dismissed
+            if (_uiState.value.continuous && !message.requiresAcknowledgement) startLocating()
         }
+    }
+
+    fun onMessageDismissed() {
+        val resume = _uiState.value.message?.requiresAcknowledgement == true && _uiState.value.continuous
+        _uiState.update { it.copy(message = null) }
+        if (resume) viewModelScope.launch { startLocating() }
     }
 
     fun endSearch() {
@@ -270,18 +287,26 @@ class DuplicateSearchViewModel @Inject constructor(
 
     // ── Internals ──
 
-    private suspend fun registerFind(searchId: Long, tid: String): DuplicateMessage =
-        when (val result = repository.registerFind(searchId, tid)) {
+    private suspend fun registerFind(searchId: Long, tid: String): DuplicateMessage {
+        val normalized = tid.uppercase()
+        return when (val result = repository.registerFind(searchId, tid)) {
             is RegisterFindResult.Saved -> {
-                _uiState.update { it.copy(foundCount = result.findNo, lastTid = tid.uppercase()) }
-                DuplicateMessage.Saved(result.findNo)
+                _uiState.update { it.copy(foundCount = result.findNo, lastTid = normalized) }
+                result.previousFoundAt
+                    ?.let { DuplicateMessage.SavedAgain(result.findNo, normalized, it) }
+                    ?: DuplicateMessage.Saved(result.findNo)
             }
-            is RegisterFindResult.AlreadyFound -> DuplicateMessage.AlreadyFound(result.findNo)
+            is RegisterFindResult.AlreadyInSearch -> {
+                _uiState.update { it.copy(lastTid = normalized) }
+                DuplicateMessage.AlreadyFound(result.findNo, normalized, result.foundAt)
+            }
         }
+    }
 
     private fun onTrigger(pressed: Boolean) {
         if (!screenActive) return
         val state = _uiState.value
+        if (state.message?.requiresAcknowledgement == true) return
         when (state.phase) {
             DuplicatePhase.TARGET -> if (pressed) captureFromReader()
             DuplicatePhase.SEARCH -> if (!state.continuous && !state.busy) {

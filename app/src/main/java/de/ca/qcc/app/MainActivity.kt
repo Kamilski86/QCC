@@ -310,6 +310,7 @@ private fun AppNav() {
                     onContinuousChange = duplicateViewModel::setContinuous,
                     onConfirmFind = duplicateViewModel::confirmFind,
                     onEndSearch = duplicateViewModel::endSearch,
+                    onMessageDismissed = duplicateViewModel::onMessageDismissed,
                     onOpenDrawer = { scope.launch { drawerState.open() } }
                 )
             }

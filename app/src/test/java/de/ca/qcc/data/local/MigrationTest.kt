@@ -71,6 +71,34 @@ class MigrationTest {
         assertEquals(0, count(db, "duplicate_finds"))
     }
 
+    @Test
+    fun migrate7To8_keepsFinds_allowsSameTidInOtherSearch_butNotTwiceInOne() {
+        helper.createDatabase(DB_NAME, 7).apply {
+            execSQL("INSERT INTO duplicate_searches (startedAt, sgtin, epc) VALUES (1, 's', 'e')")
+            execSQL("INSERT INTO duplicate_finds (searchId, foundAt, tid, findNo) VALUES (1, 2, 'T1', 1)")
+            close()
+        }
+
+        val db = helper.runMigrationsAndValidate(DB_NAME, 8, true, MIGRATION_7_8)
+
+        assertEquals(1, count(db, "duplicate_finds"))
+        db.query("SELECT previousFoundAt FROM duplicate_finds").use {
+            it.moveToFirst()
+            assertTrue(it.isNull(0))
+        }
+        db.execSQL("INSERT INTO duplicate_searches (startedAt, sgtin, epc) VALUES (3, 's', 'e')")
+        db.execSQL("INSERT INTO duplicate_finds (searchId, foundAt, tid, findNo, previousFoundAt) VALUES (2, 4, 'T1', 1, 2)")
+        assertEquals(2, count(db, "duplicate_finds"))
+
+        var thrown = false
+        try {
+            db.execSQL("INSERT INTO duplicate_finds (searchId, foundAt, tid, findNo) VALUES (2, 5, 'T1', 2)")
+        } catch (e: SQLiteConstraintException) {
+            thrown = true
+        }
+        assertTrue("same TID twice in one search must violate the unique index", thrown)
+    }
+
     private fun count(db: SupportSQLiteDatabase, table: String): Int =
         db.query("SELECT COUNT(*) FROM $table").use {
             it.moveToFirst()

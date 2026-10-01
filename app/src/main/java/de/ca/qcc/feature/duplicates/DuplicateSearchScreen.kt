@@ -16,6 +16,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -44,6 +45,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import de.ca.qcc.R
+import java.text.DateFormat
+import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,12 +61,15 @@ fun DuplicateSearchScreen(
     onContinuousChange: (Boolean) -> Unit,
     onConfirmFind: () -> Unit,
     onEndSearch: () -> Unit,
+    onMessageDismissed: () -> Unit,
     onOpenDrawer: () -> Unit
 ) {
     val blackButtonColors = ButtonDefaults.buttonColors(
         containerColor = Color.Black,
         contentColor = Color.White
     )
+
+    state.message?.takeIf { it.requiresAcknowledgement }?.let { MessageDialog(it, onMessageDismissed) }
 
     Scaffold(
         topBar = {
@@ -91,7 +97,8 @@ fun DuplicateSearchScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            state.message?.let { message -> item(key = "message") { MessageCard(message) } }
+            state.message?.takeIf { !it.requiresAcknowledgement }
+                ?.let { message -> item(key = "message") { MessageCard(message) } }
 
             if (state.phase == DuplicatePhase.TARGET) {
                 item(key = "input") {
@@ -257,6 +264,23 @@ fun DuplicateSearchScreen(
     }
 }
 
+// Cannot be overlooked and blocks the screen until confirmed with OK
+@Composable
+private fun MessageDialog(message: DuplicateMessage, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = {},
+        containerColor = Color.White,
+        title = { Text(message.dialogTitle(), color = Color.Black, fontWeight = FontWeight.Bold) },
+        text = { Text(message.text(), color = Color.Black) },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
+            ) { Text(stringResource(R.string.ok)) }
+        }
+    )
+}
+
 @Composable
 private fun WhiteCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     Card(
@@ -327,9 +351,20 @@ private fun MessageCard(message: DuplicateMessage) {
 }
 
 @Composable
+private fun DuplicateMessage.dialogTitle(): String = stringResource(
+    if (this is DuplicateMessage.SavedAgain) R.string.dup_dialog_title_again else R.string.dup_dialog_title_already
+)
+
+private fun formatDateTime(millis: Long): String =
+    DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(millis))
+
+@Composable
 private fun DuplicateMessage.text(): String = when (this) {
     is DuplicateMessage.Saved -> stringResource(R.string.dup_msg_saved, findNo)
-    is DuplicateMessage.AlreadyFound -> stringResource(R.string.dup_msg_already_found, findNo)
+    is DuplicateMessage.SavedAgain ->
+        stringResource(R.string.dup_msg_saved_again, findNo, tid, formatDateTime(previousFoundAt))
+    is DuplicateMessage.AlreadyFound ->
+        stringResource(R.string.dup_msg_already_found, findNo, tid, formatDateTime(foundAt))
     DuplicateMessage.NoTagAtReader -> stringResource(R.string.dup_msg_no_tag)
     DuplicateMessage.MultipleTags -> stringResource(R.string.dup_msg_multiple)
     DuplicateMessage.CaptureNoTag -> stringResource(R.string.dup_msg_capture_none)

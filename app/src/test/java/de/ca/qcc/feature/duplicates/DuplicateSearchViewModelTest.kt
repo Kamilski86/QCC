@@ -256,8 +256,11 @@ class DuplicateSearchViewModelTest {
         assertEquals(tid, vm.uiState.value.lastTid)
 
         vm.confirmFind()
-        assertEquals(DuplicateMessage.AlreadyFound(1), vm.uiState.value.message)
+        val message = vm.uiState.value.message as DuplicateMessage.AlreadyFound
+        assertEquals(1, message.findNo)
+        assertEquals(tid, message.tid)
         assertEquals(1, vm.uiState.value.foundCount)
+        assertEquals(tid, vm.uiState.value.lastTid)
 
         reader.tidsNearby = Result.failure(IllegalStateException("boom"))
         vm.confirmFind()
@@ -540,5 +543,66 @@ class DuplicateSearchViewModelTest {
 
         assertFalse(reader.locating)
         assertTrue(reader.locateCalls.isEmpty())
+    }
+
+    @Test
+    fun confirmFind_tidFromEarlierSearch_countsAndAsksForAcknowledgement() = runTest {
+        val target = LocateTarget(epc, sgtin)
+        val earlier = repository.startSearch(target, store = null)
+        repository.registerFind(earlier, tid)
+        val foundBefore = db.duplicateDao().getFinds(earlier).single().foundAt
+        repository.finishSearch(earlier)
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        reader.tidsNearby = Result.success(listOf(tid))
+
+        vm.confirmFind()
+
+        val state = vm.uiState.value
+        assertEquals(1, state.foundCount)
+        assertEquals(tid, state.lastTid)
+        assertEquals(DuplicateMessage.SavedAgain(1, tid, foundBefore), state.message)
+        assertTrue(state.message!!.requiresAcknowledgement)
+    }
+
+    @Test
+    fun pendingAcknowledgement_ignoresTrigger_untilDismissed() = runTest {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        reader.tidsNearby = Result.success(listOf(tid))
+        vm.confirmFind()
+        vm.confirmFind() // same tag again -> AlreadyFound dialog
+        assertTrue(vm.uiState.value.message!!.requiresAcknowledgement)
+
+        reader.trigger.emit(true)
+        assertFalse(vm.uiState.value.locating)
+
+        vm.onMessageDismissed()
+        assertNull(vm.uiState.value.message)
+        reader.trigger.emit(true)
+        assertTrue(vm.uiState.value.locating)
+    }
+
+    @Test
+    fun continuousMode_waitsForDismissBeforeLocatingAgain() {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        reader.tidsNearby = Result.success(listOf(tid))
+        vm.confirmFind()
+        vm.setContinuous(true)
+        vm.confirmFind() // AlreadyFound dialog opens
+        assertFalse(vm.uiState.value.locating)
+
+        vm.onMessageDismissed()
+
+        assertTrue(vm.uiState.value.locating)
+    }
+
+    @Test
+    fun resumedSearch_restoresLastTid() = runTest {
+        val id = repository.startSearch(LocateTarget(epc, sgtin), store = null)
+        repository.registerFind(id, tid)
+
+        assertEquals(tid, createViewModel().uiState.value.lastTid)
     }
 }

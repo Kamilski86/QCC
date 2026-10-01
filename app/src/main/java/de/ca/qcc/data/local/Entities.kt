@@ -48,12 +48,14 @@ data class DuplicateSearchEntity(
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index(value = ["tid"], unique = true), Index(value = ["searchId"])]
+    indices = [Index(value = ["searchId", "tid"], unique = true), Index(value = ["tid"])]
 )
 data class DuplicateFindEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val searchId: Long,
     val foundAt: Long,
     val tid: String,
-    val findNo: Int
+    val findNo: Int,
+    // When this TID was last found in an earlier search (null = first time seen)
+    val previousFoundAt: Long? = null
 )

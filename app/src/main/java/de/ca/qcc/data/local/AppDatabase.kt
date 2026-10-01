@@ -10,7 +10,7 @@ import androidx.room.RoomDatabase
         DuplicateSearchEntity::class,
         DuplicateFindEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {

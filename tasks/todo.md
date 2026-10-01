@@ -9,11 +9,11 @@
 
 ## Phase 2 – Funde & Meldungen
 Entscheidung (User): Confirm find zählt auch bei bereits bekannter TID und vermerkt "already found at: DATUM"
-- [ ] OFFEN klären: gleiche TID mehrfach in derselben Suche zählen? (Default: nur 1x je Suche; frühere Suche -> zählt + Vermerk)
-- [ ] Datenmodell: Funde je Suche; Verweis auf frühesten früheren Fund (Datum) -> Migration 7->8, CSV-Spalte
-- [ ] `lastTid` aus DB wiederherstellen
-- [ ] Meldungen (außer Saved) als AlertDialog mit OK; Trigger während Dialog ignorieren
-- [ ] Strings EN/DE/PL
+- [x] Entscheidung (Option A): je Suche zählt eine TID 1x; aus früherer Suche bekannt -> zählt + Vermerk mit Datum
+- [x] Datenmodell: Funde je Suche; Verweis auf frühesten früheren Fund (Datum) -> Migration 7->8, CSV-Spalte
+- [x] `lastTid` aus DB wiederherstellen
+- [x] Dialog mit OK für "Already found" und "Found again" (Trigger/Locate pausieren bis OK). Andere Meldungen bleiben Karten – Platz in Phase 4 klären
+- [x] Strings EN/DE/PL
 
 ## Phase 3 – Dashboard
 - [ ] QR-/RFID-Scan-Button entfernen; Reset + Export bleiben; "Find duplicates"-Button darunter

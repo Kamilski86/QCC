@@ -44,12 +44,18 @@ interface DuplicateDao {
     @Query("UPDATE duplicate_searches SET endedAt = :endedAt, exportFileName = :fileName WHERE id = :id")
     suspend fun finishSearch(id: Long, endedAt: Long, fileName: String?)
 
-    /** Returns -1 if the TID already exists (unique index); the row is not inserted. */
+    /** Returns -1 if the TID is already in this search (unique index); the row is not inserted. */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertFind(find: DuplicateFindEntity): Long
 
-    @Query("SELECT * FROM duplicate_finds WHERE tid = :tid LIMIT 1")
-    suspend fun findByTid(tid: String): DuplicateFindEntity?
+    @Query("SELECT * FROM duplicate_finds WHERE searchId = :searchId AND tid = :tid LIMIT 1")
+    suspend fun findInSearch(searchId: Long, tid: String): DuplicateFindEntity?
+
+    @Query("SELECT MAX(foundAt) FROM duplicate_finds WHERE tid = :tid AND searchId != :searchId")
+    suspend fun latestFindInOtherSearches(searchId: Long, tid: String): Long?
+
+    @Query("SELECT tid FROM duplicate_finds WHERE searchId = :searchId ORDER BY findNo DESC LIMIT 1")
+    suspend fun lastTid(searchId: Long): String?
 
     @Query("SELECT * FROM duplicate_finds WHERE searchId = :searchId ORDER BY findNo")
     suspend fun getFinds(searchId: Long): List<DuplicateFindEntity>

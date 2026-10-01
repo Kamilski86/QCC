@@ -67,10 +67,14 @@ data class DuplicateSearch(
     val id: Long,
     val target: LocateTarget,
     val store: String?,
-    val foundCount: Int
+    val foundCount: Int,
+    val lastTid: String? = null
 )
 
 sealed interface RegisterFindResult {
-    data class Saved(val findNo: Int) : RegisterFindResult
-    data class AlreadyFound(val findNo: Int) : RegisterFindResult
+    // previousFoundAt != null: the tag was already found in an earlier search but counts again
+    data class Saved(val findNo: Int, val previousFoundAt: Long? = null) : RegisterFindResult
+
+    // Same TID twice within one search: not counted again
+    data class AlreadyInSearch(val findNo: Int, val foundAt: Long) : RegisterFindResult
 }

@@ -51,14 +51,28 @@ class DuplicateSearchRepositoryTest {
     }
 
     @Test
-    fun registerFind_knownTid_isAlreadyFound_evenInLaterSearch() = runTest {
+    fun registerFind_tidFromEarlierSearch_countsAgain_andReportsWhenItWasFoundBefore() = runTest {
         val first = repository.startSearch(target, store = null)
         repository.registerFind(first, "E280AA")
+        val foundBefore = db.duplicateDao().getFinds(first).single().foundAt
         repository.finishSearch(first)
 
         val second = repository.startSearch(target, store = null)
 
-        assertEquals(RegisterFindResult.AlreadyFound(1), repository.registerFind(second, "e280aa"))
+        assertEquals(RegisterFindResult.Saved(1, foundBefore), repository.registerFind(second, "e280aa"))
+        assertEquals(1, repository.getOpenSearch()!!.foundCount)
+    }
+
+    @Test
+    fun registerFind_tidFoundInSeveralEarlierSearches_reportsTheLatest() = runTest {
+        val first = repository.startSearch(target, store = null)
+        repository.registerFind(first, "E280AA")
+        val second = repository.startSearch(target, store = null)
+        repository.registerFind(second, "E280AA")
+        val latest = db.duplicateDao().getFinds(second).single().foundAt
+        val third = repository.startSearch(target, store = null)
+
+        assertEquals(RegisterFindResult.Saved(1, latest), repository.registerFind(third, "E280AA"))
     }
 
     @Test
@@ -84,10 +98,10 @@ class DuplicateSearchRepositoryTest {
 
         assertTrue(fileName.matches(Regex("""duplicates_\d{8}_\d{6}_\d+\.csv""")))
         val lines = writer.files.getValue(fileName).trim().lines()
-        assertEquals("Timestamp,SGTIN,EPC,TID,Find No,Store", lines[0])
+        assertEquals("Timestamp,SGTIN,EPC,TID,Find No,Store,Previously Found", lines[0])
         assertEquals(3, lines.size)
-        assertTrue(lines[1].endsWith(",4065546.092768.12884901894,3034F824285A980300000006,E280AA,1,0815"))
-        assertTrue(lines[2].endsWith(",E280BB,2,0815"))
+        assertTrue(lines[1].endsWith(",4065546.092768.12884901894,3034F824285A980300000006,E280AA,1,0815,"))
+        assertTrue(lines[2].endsWith(",E280BB,2,0815,"))
         assertNull(repository.getOpenSearch())
     }
 
@@ -101,11 +115,46 @@ class DuplicateSearchRepositoryTest {
     }
 
     @Test
-    fun registerFind_sameTidTwiceInSameSearch_isAlreadyFound() = runTest {
+    fun registerFind_sameTidTwiceInSameSearch_isNotCountedAgain() = runTest {
         val id = repository.startSearch(target, store = null)
 
         assertEquals(RegisterFindResult.Saved(1), repository.registerFind(id, "E280AA"))
-        assertEquals(RegisterFindResult.AlreadyFound(1), repository.registerFind(id, "e280aa"))
+        val foundAt = db.duplicateDao().getFinds(id).single().foundAt
+        assertEquals(RegisterFindResult.AlreadyInSearch(1, foundAt), repository.registerFind(id, "e280aa"))
+        assertEquals(1, repository.getOpenSearch()!!.foundCount)
+    }
+
+    @Test
+    fun getOpenSearch_restoresLastFoundTid() = runTest {
+        val id = repository.startSearch(target, store = null)
+        repository.registerFind(id, "E280AA")
+        repository.registerFind(id, "E280BB")
+
+        assertEquals("E280BB", repository.getOpenSearch()!!.lastTid)
+    }
+
+    @Test
+    fun getOpenSearch_withoutFinds_hasNoLastTid() = runTest {
+        repository.startSearch(target, store = null)
+
+        assertNull(repository.getOpenSearch()!!.lastTid)
+    }
+
+    @Test
+    fun finishSearch_csvShowsWhenARepeatedTidWasFoundBefore() = runTest {
+        val first = repository.startSearch(target, store = null)
+        repository.registerFind(first, "E280AA")
+        val foundBefore = db.duplicateDao().getFinds(first).single().foundAt
+        val second = repository.startSearch(target, store = null)
+        repository.registerFind(second, "E280AA")
+        repository.registerFind(second, "E280BB")
+
+        val lines = writer.files.getValue(repository.finishSearch(second)!!).trim().lines()
+
+        val expected = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+            .format(java.util.Date(foundBefore))
+        assertTrue(lines[1].endsWith(",E280AA,1,,$expected"))
+        assertTrue(lines[2].endsWith(",E280BB,2,,"))
     }
 
     @Test
@@ -156,7 +205,7 @@ class DuplicateSearchRepositoryTest {
 
         val fileName = repository.finishSearch(id)!!
 
-        assertTrue(writer.files.getValue(fileName).trim().lines()[1].endsWith(",\"Store \"\"A\"\", B\""))
+        assertTrue(writer.files.getValue(fileName).trim().lines()[1].endsWith(",\"Store \"\"A\"\", B\","))
     }
 
     @Test

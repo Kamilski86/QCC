@@ -40,28 +40,35 @@ class DuplicateSearchRepository @Inject constructor(
             id = search.id,
             target = search.toTarget(),
             store = search.store,
-            foundCount = dao.countFinds(search.id)
+            foundCount = dao.countFinds(search.id),
+            lastTid = dao.lastTid(search.id)
         )
     }
 
-    // TID is globally unique: a tag found in any earlier search is reported, not counted again
+    // One find per TID and search. A TID known from an earlier search counts again (the tag was
+    // put back) and carries the date it was found before.
     suspend fun registerFind(searchId: Long, tid: String): RegisterFindResult = db.withTransaction {
         val normalized = tid.uppercase()
-        dao.findByTid(normalized)?.let { return@withTransaction RegisterFindResult.AlreadyFound(it.findNo) }
+        dao.findInSearch(searchId, normalized)?.let {
+            return@withTransaction RegisterFindResult.AlreadyInSearch(it.findNo, it.foundAt)
+        }
+        val previousFoundAt = dao.latestFindInOtherSearches(searchId, normalized)
         val findNo = dao.countFinds(searchId) + 1
         val rowId = dao.insertFind(
             DuplicateFindEntity(
                 searchId = searchId,
                 foundAt = System.currentTimeMillis(),
                 tid = normalized,
-                findNo = findNo
+                findNo = findNo,
+                previousFoundAt = previousFoundAt
             )
         )
         if (rowId != -1L) {
-            RegisterFindResult.Saved(findNo)
+            RegisterFindResult.Saved(findNo, previousFoundAt)
         } else {
             // Lost a race against a concurrent registration of the same TID
-            RegisterFindResult.AlreadyFound(checkNotNull(dao.findByTid(normalized)).findNo)
+            val existing = checkNotNull(dao.findInSearch(searchId, normalized))
+            RegisterFindResult.AlreadyInSearch(existing.findNo, existing.foundAt)
         }
     }
 
@@ -90,7 +97,7 @@ class DuplicateSearchRepository @Inject constructor(
 internal fun buildDuplicatesCsv(search: DuplicateSearchEntity, finds: List<DuplicateFindEntity>): String {
     val tsFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
     return buildString {
-        appendLine("Timestamp,SGTIN,EPC,TID,Find No,Store")
+        appendLine("Timestamp,SGTIN,EPC,TID,Find No,Store,Previously Found")
         finds.forEach { find ->
             appendLine(
                 listOf(
@@ -99,7 +106,8 @@ internal fun buildDuplicatesCsv(search: DuplicateSearchEntity, finds: List<Dupli
                     search.epc,
                     find.tid,
                     find.findNo.toString(),
-                    search.store.orEmpty()
+                    search.store.orEmpty(),
+                    find.previousFoundAt?.let { tsFormat.format(Date(it)) }.orEmpty()
                 ).joinToString(",") { it.csvEscape() }
             )
         }

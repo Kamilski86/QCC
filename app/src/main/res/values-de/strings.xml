@@ -71,7 +71,13 @@
     <string name="dup_confirm_find">Fund bestätigen</string>
     <string name="dup_end_search">Suche beenden</string>
     <string name="dup_msg_saved">Fund #%1$d gespeichert – Artikel entfernen</string>
-    <string name="dup_msg_already_found">Bereits gefunden (#%1$d)</string>
+    <string name="dup_msg_already_found">In dieser Suche bereits als Fund #%1$d gezählt (%3$s).
+TID: %2$s</string>
+    <string name="dup_msg_saved_again">Als Fund #%1$d gezählt.
+Dieser Tag wurde bereits am %3$s gefunden.
+TID: %2$s</string>
+    <string name="dup_dialog_title_already">Bereits gefunden</string>
+    <string name="dup_dialog_title_again">Erneut gefunden</string>
     <string name="dup_msg_no_tag">Kein Duplikat am Reader – falscher Artikel?</string>
     <string name="dup_msg_multiple">Mehrere Duplikate erkannt – Artikel isolieren</string>
     <string name="dup_msg_capture_none">Kein Tag erkannt – Artikel direkt an die Pistole halten</string>

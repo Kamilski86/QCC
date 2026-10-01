@@ -1,0 +1,264 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 8,
+    "identityHash": "473c0fb6d84cb67d7e7710775fc97a6f",
+    "entities": [
+      {
+        "tableName": "mismatches",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, `epc` TEXT NOT NULL, `sgtin` TEXT NOT NULL, `gtinTag` TEXT NOT NULL, `gtinQr` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "epc",
+            "columnName": "epc",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sgtin",
+            "columnName": "sgtin",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gtinTag",
+            "columnName": "gtinTag",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gtinQr",
+            "columnName": "gtinQr",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "scans",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `timestamp` INTEGER NOT NULL, `gtinQr` TEXT NOT NULL, `gtinTag` TEXT NOT NULL, `isMatch` INTEGER NOT NULL, `sgtinQr` TEXT NOT NULL, `sgtinTag` TEXT NOT NULL, `qrRaw` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gtinQr",
+            "columnName": "gtinQr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "gtinTag",
+            "columnName": "gtinTag",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isMatch",
+            "columnName": "isMatch",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sgtinQr",
+            "columnName": "sgtinQr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sgtinTag",
+            "columnName": "sgtinTag",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "qrRaw",
+            "columnName": "qrRaw",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "duplicate_searches",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `startedAt` INTEGER NOT NULL, `endedAt` INTEGER, `sgtin` TEXT NOT NULL, `epc` TEXT NOT NULL, `store` TEXT, `exportFileName` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startedAt",
+            "columnName": "startedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endedAt",
+            "columnName": "endedAt",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "sgtin",
+            "columnName": "sgtin",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "epc",
+            "columnName": "epc",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "store",
+            "columnName": "store",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "exportFileName",
+            "columnName": "exportFileName",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "duplicate_finds",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `searchId` INTEGER NOT NULL, `foundAt` INTEGER NOT NULL, `tid` TEXT NOT NULL, `findNo` INTEGER NOT NULL, `previousFoundAt` INTEGER, FOREIGN KEY(`searchId`) REFERENCES `duplicate_searches`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "searchId",
+            "columnName": "searchId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "foundAt",
+            "columnName": "foundAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tid",
+            "columnName": "tid",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "findNo",
+            "columnName": "findNo",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "previousFoundAt",
+            "columnName": "previousFoundAt",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_duplicate_finds_searchId_tid",
+            "unique": true,
+            "columnNames": [
+              "searchId",
+              "tid"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_duplicate_finds_searchId_tid` ON `${TABLE_NAME}` (`searchId`, `tid`)"
+          },
+          {
+            "name": "index_duplicate_finds_tid",
+            "unique": false,
+            "columnNames": [
+              "tid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_duplicate_finds_tid` ON `${TABLE_NAME}` (`tid`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "duplicate_searches",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "searchId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '473c0fb6d84cb67d7e7710775fc97a6f')"
+    ]
+  }
+}
