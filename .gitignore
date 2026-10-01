@@ -22,3 +22,11 @@ vendor/zebra/ZIOTCSampleApp/
 
 # generierte Gesamtdatei der Doku
 docs/confluence/QCC-Komplettdokumentation.md
+
+# Signierung (Secrets, nie committen)
+keystore.properties
+*.jks
+*.keystore
+
+# lokal exportierte APKs
+dist/
