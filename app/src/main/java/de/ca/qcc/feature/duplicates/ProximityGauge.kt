@@ -5,7 +5,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +31,8 @@ import androidx.compose.ui.unit.sp
 import de.ca.qcc.R
 import kotlin.math.min
 
+// Height at which the gauge is drawn in its original size (296dp wide card content, 2:1)
+private val GAUGE_FULL_HEIGHT = 148.dp
 private val GaugeTrack = Color(0xFFE6E6E6)
 private val GaugeGradient = listOf(Color(0xFFE53935), Color(0xFFFBC02D), Color(0xFF2E7D32))
 
@@ -55,9 +57,12 @@ fun ProximityGauge(proximity: Int, active: Boolean, modifier: Modifier = Modifie
         }
     }
 
-    Box(modifier.fillMaxWidth().aspectRatio(2f), contentAlignment = Alignment.BottomCenter) {
+    // Keeps its 2:1 shape inside whatever space the caller gives it; the arc, its stroke and the
+    // texts scale with the height so a shrunken gauge looks the same, only smaller
+    BoxWithConstraints(modifier.aspectRatio(2f), contentAlignment = Alignment.BottomCenter) {
+        val scale = (maxHeight / GAUGE_FULL_HEIGHT).coerceIn(0.4f, 1f)
         Canvas(Modifier.fillMaxSize()) {
-            val stroke = 16.dp.toPx()
+            val stroke = (16.dp * scale).toPx()
             // Keep the round caps inside the canvas: width loses a full stroke; vertically the
             // arc needs a half stroke above the top and a half stroke below its baseline
             val diameter = min(size.width - stroke, 2 * (size.height - stroke))
@@ -86,8 +91,12 @@ fun ProximityGauge(proximity: Int, active: Boolean, modifier: Modifier = Modifie
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("$proximity", fontSize = 46.sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
-            Text("% " + stringResource(R.string.dup_proximity), color = Color(0xFF555555))
+            Text("$proximity", fontSize = (46 * scale).sp, fontWeight = FontWeight.ExtraBold, color = Color.Black)
+            Text(
+                "% " + stringResource(R.string.dup_proximity),
+                fontSize = (14 * scale).sp,
+                color = Color(0xFF555555)
+            )
         }
     }
 }

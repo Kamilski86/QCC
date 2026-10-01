@@ -24,8 +24,6 @@
     <string name="qr_gtin">QR GTIN</string>
     <string name="rfid_gtin">RFID GTIN</string>
 
-    <string name="qr_scan">Skanuj QR</string>
-    <string name="rfid_scan">Skanuj RFID</string>
     <string name="reset">Resetuj</string>
 
     <string name="reader_settings">Ustawienia czytnika</string>
@@ -42,7 +40,6 @@
     <string name="manual_entry_question">Czy chcesz wprowadzić GTIN ręcznie?</string>
     <string name="tap_for_manual_entry">Wprowadzanie ręczne</string>
     <string name="enter_gtin">Wprowadź GTIN</string>
-    <string name="apply">Zastosuj</string>
     <string name="yes">Tak</string>
     <string name="no">Nie</string>
     <string name="fourteen_digits_required">Wymagane 14 cyfr</string>
@@ -54,12 +51,12 @@
     <string name="dup_target_hint">EPC lub SGTIN</string>
     <string name="dup_sgtin_filter">Wartość filtra (SGTIN)</string>
     <string name="dup_sgtin_filter_hint">Zwykle 1 (artykuł detaliczny). Dotyczy tylko wpisanego SGTIN.</string>
-    <string name="dup_read_with_reader">Odczytaj czytnikiem</string>
     <string name="dup_hint_capture">Lub naciśnij spust, trzymając artykuł przy czytniku</string>
     <string name="dup_store_optional">Sklep (opcjonalnie)</string>
     <string name="dup_start_search">Rozpocznij wyszukiwanie</string>
     <string name="dup_target_sgtin">Szukany SGTIN</string>
     <string name="dup_epc">EPC</string>
+    <string name="dup_tid">TID</string>
     <string name="dup_store">Sklep</string>
     <string name="dup_proximity">bliskość</string>
     <string name="dup_hint_hold_trigger">Przytrzymaj spust i przesuwaj czytnikiem</string>
@@ -67,7 +64,6 @@
     <string name="dup_continuous">Wyszukiwanie ciągłe</string>
     <string name="dup_continuous_sub">Wyszukiwanie bez spustu</string>
     <string name="dup_found_count">Znalezione (unikalne TID)</string>
-    <string name="dup_last">Ostatni</string>
     <string name="dup_confirm_find">Potwierdź znalezisko</string>
     <string name="dup_end_search">Zakończ wyszukiwanie</string>
     <string name="dup_msg_saved">Znalezisko #%1$d zapisane – usuń artykuł</string>

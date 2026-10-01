@@ -16,12 +16,17 @@ Entscheidung (User): Confirm find zählt auch bei bereits bekannter TID und verm
 - [x] Strings EN/DE/PL
 
 ## Phase 3 – Dashboard
-- [ ] QR-/RFID-Scan-Button entfernen; Reset + Export bleiben; "Find duplicates"-Button darunter
+- [x] QR-/RFID-Scan-Button entfernen; Reset + Export bleiben; "Find duplicates"-Button darunter
 
 ## Phase 4 – Duplicates-Masken
-- [ ] Maske 1: Apply + "Read with reader" weg (Hinweistext bleibt), Live-Parse, Start parst nochmal
-- [ ] Maske 2: ohne Scrollen, TID-Zeile zwischen EPC und Store, "Last" in Zähler-Karte entfällt
-- [ ] Robolectric-Layouttest (kleines Display)
+- [x] Maske 1: Apply + "Read with reader" weg (Hinweistext bleibt), Live-Parse, Start parst nochmal
+- [x] Maske 2: ohne Scrollen, TID-Zeile zwischen EPC und Store, "Last" in Zähler-Karte entfällt
+- [x] Robolectric-Layouttest (kleines Display)
 
 ## Phase 5 – Verifikation
-- [ ] Unit-Tests, assembleDebug, Gerätetest inkl. 2 Duplikate, danach Merge nach main
+- [x] Unit-Tests, assembleDebug (Rest offen:) Gerätetest inkl. 2 Duplikate, danach Merge nach main
+
+## Offen (Gerät)
+- [ ] Layout auf echtem CT37 prüfen (Gauge im Worst Case mit Store ca. 82 dp im Test bei 360x600 dp)
+- [ ] Dashboard -> Duplicates -> Dashboard mehrfach; Test mit 2 Duplikaten + Wiederfund (Datum im Popup)
+- [ ] Merge nach main

@@ -45,11 +45,9 @@ fun DashboardScreen(
     scansToday: Int,
     mismatchesToday: Int,
     scanState: ScanUiState,
-    onQrScan: () -> Unit,
-    onManualQrSubmit: (String) -> Unit,
-    onRfidScan: () -> Unit,
     onReset: () -> Unit,
     onExport: () -> Unit,
+    onFindDuplicates: () -> Unit,
     exportMessage: String?,
     onOpenDrawer: () -> Unit
 ) {
@@ -149,27 +147,6 @@ fun DashboardScreen(
 
                 item {
                     Button(
-                        onClick = onQrScan,
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        colors = blackButtonColors
-                    ) {
-                        Text(stringResource(R.string.qr_scan))
-                    }
-                }
-
-                item {
-                    Button(
-                        onClick = onRfidScan,
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        enabled = scanState.qr != null,
-                        colors = blackButtonColors
-                    ) {
-                        Text(stringResource(R.string.rfid_scan))
-                    }
-                }
-
-                item {
-                    Button(
                         onClick = onReset,
                         modifier = Modifier.fillMaxWidth().height(56.dp),
                         colors = blackButtonColors
@@ -185,6 +162,16 @@ fun DashboardScreen(
                         colors = blackButtonColors
                     ) {
                         Text(stringResource(R.string.export_mismatches_csv))
+                    }
+                }
+
+                item {
+                    Button(
+                        onClick = onFindDuplicates,
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        colors = blackButtonColors
+                    ) {
+                        Text(stringResource(R.string.find_duplicates))
                     }
                 }
 

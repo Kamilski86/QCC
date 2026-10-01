@@ -152,17 +152,83 @@ class DuplicateSearchViewModelTest {
     }
 
     @Test
-    fun changingSgtinFilter_clearsExistingTarget() {
+    fun changingSgtinFilter_reencodesTypedSgtin() {
         val vm = createViewModel()
         vm.onInputChange(sgtin)
-        vm.applyInput()
-        assertNotNull(vm.uiState.value.target)
+        assertEquals("3034F824285A980300000006", vm.uiState.value.target?.epc)
 
         vm.onSgtinFilterChange(2)
 
-        assertNull(vm.uiState.value.target)
+        assertEquals("3054F824285A980300000006", vm.uiState.value.target?.epc)
         assertNull(vm.uiState.value.message)
         assertEquals(2, vm.uiState.value.sgtinFilter)
+    }
+
+    @Test
+    fun typingValidInput_setsTargetWithoutApply() {
+        val vm = createViewModel()
+
+        vm.onInputChange(sgtin)
+
+        assertEquals(epc, vm.uiState.value.target?.epc)
+        assertNull(vm.uiState.value.message)
+    }
+
+    @Test
+    fun typingIncompleteInput_hasNoTarget_andNoErrorWhileTyping() {
+        val vm = createViewModel()
+        vm.onInputChange(sgtin)
+
+        vm.onInputChange("4065546.0927")
+
+        assertNull(vm.uiState.value.target)
+        assertNull(vm.uiState.value.message)
+    }
+
+    @Test
+    fun startSearch_parsesTypedInputWithoutApply() {
+        val vm = createViewModel()
+        vm.onInputChange(sgtin)
+
+        vm.startSearch()
+
+        assertEquals(DuplicatePhase.SEARCH, vm.uiState.value.phase)
+        assertEquals(epc, vm.uiState.value.target?.epc)
+    }
+
+    @Test
+    fun startSearch_withInvalidInput_reportsInvalidTarget_andStaysInTargetPhase() {
+        val vm = createViewModel()
+        vm.onInputChange("not-a-target")
+
+        vm.startSearch()
+
+        assertEquals(DuplicatePhase.TARGET, vm.uiState.value.phase)
+        assertEquals(DuplicateMessage.InvalidTarget, vm.uiState.value.message)
+    }
+
+    @Test
+    fun onlyPlainSuccessMessages_areShownWithoutDialog() {
+        val plain = listOf(
+            DuplicateMessage.Saved(1),
+            DuplicateMessage.Exported("a.csv"),
+            DuplicateMessage.NothingExported
+        )
+        val needsOk = listOf(
+            DuplicateMessage.AlreadyFound(1, tid, 0L),
+            DuplicateMessage.SavedAgain(1, tid, 0L),
+            DuplicateMessage.NoTagAtReader,
+            DuplicateMessage.MultipleTags,
+            DuplicateMessage.CaptureNoTag,
+            DuplicateMessage.CaptureMultipleTags,
+            DuplicateMessage.InvalidTarget,
+            DuplicateMessage.ReaderNotConnected,
+            DuplicateMessage.ReaderError("x"),
+            DuplicateMessage.ExportFailed("x")
+        )
+
+        assertTrue(plain.none { it.requiresAcknowledgement })
+        assertTrue(needsOk.all { it.requiresAcknowledgement })
     }
 
     @Test

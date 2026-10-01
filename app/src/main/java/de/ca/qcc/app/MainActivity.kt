@@ -139,6 +139,12 @@ private fun AppNav() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    // Never stack a second Duplicates entry (and view model)
+    fun openDuplicates() = navController.navigate(Screen.Duplicates.route) {
+        launchSingleTop = true
+        popUpTo(Screen.Dashboard.route)
+    }
+
     val dashboardViewModel: DashboardViewModel = hiltViewModel()
     val exportViewModel: ExportViewModel = hiltViewModel()
     val scanViewModel: ScanViewModel = hiltViewModel()
@@ -180,11 +186,7 @@ private fun AppNav() {
                         icon = Icons.Default.Search,
                         selected = currentRoute == Screen.Duplicates.route,
                         onClick = {
-                            // Never stack a second Duplicates entry (and view model)
-                            navController.navigate(Screen.Duplicates.route) {
-                                launchSingleTop = true
-                                popUpTo(Screen.Dashboard.route)
-                            }
+                            openDuplicates()
                             scope.launch { drawerState.close() }
                         }
                     )
@@ -245,11 +247,9 @@ private fun AppNav() {
                     scansToday = state.scansToday,
                     mismatchesToday = state.mismatchesToday,
                     scanState = scanState,
-                    onQrScan = { scanViewModel.triggerQrScan() },
-                    onManualQrSubmit = { scanViewModel.setManualQrGtin(it) },
-                    onRfidScan = { scanViewModel.triggerRfidScan() },
                     onReset = { scanViewModel.reset() },
                     onExport = { exportViewModel.exportCsv() },
+                    onFindDuplicates = { openDuplicates() },
                     exportMessage = exportState.message,
                     onOpenDrawer = { scope.launch { drawerState.open() } }
                 )
@@ -304,7 +304,6 @@ private fun AppNav() {
                     onInputChange = duplicateViewModel::onInputChange,
                     onSgtinFilterChange = duplicateViewModel::onSgtinFilterChange,
                     onApplyInput = duplicateViewModel::applyInput,
-                    onCapture = duplicateViewModel::captureFromReader,
                     onStoreChange = duplicateViewModel::onStoreChange,
                     onStartSearch = duplicateViewModel::startSearch,
                     onContinuousChange = duplicateViewModel::setContinuous,

@@ -24,8 +24,6 @@
     <string name="qr_gtin">QR SGTIN</string>
     <string name="rfid_gtin">RFID SGTIN</string>
 
-    <string name="qr_scan">QR Scan</string>
-    <string name="rfid_scan">RFID Scan</string>
     <string name="reset">Reset</string>
 
     <string name="reader_settings">Reader-Einstellungen</string>
@@ -42,7 +40,6 @@
     <string name="manual_entry_question">Möchten Sie die GTIN manuell eingeben?</string>
     <string name="tap_for_manual_entry">Manualle Eingabe</string>
     <string name="enter_gtin">GTIN eingeben</string>
-    <string name="apply">Übernehmen</string>
     <string name="yes">Ja</string>
     <string name="no">Nein</string>
     <string name="fourteen_digits_required">14 Ziffern erforderlich</string>
@@ -54,12 +51,12 @@
     <string name="dup_target_hint">EPC oder SGTIN</string>
     <string name="dup_sgtin_filter">Filterwert (SGTIN)</string>
     <string name="dup_sgtin_filter_hint">Meist 1 (Verkaufsartikel). Nur bei eingetippter SGTIN relevant.</string>
-    <string name="dup_read_with_reader">Mit Pistole anlesen</string>
     <string name="dup_hint_capture">Oder Trigger drücken, Artikel direkt an der Pistole</string>
     <string name="dup_store_optional">Filiale (optional)</string>
     <string name="dup_start_search">Suche starten</string>
     <string name="dup_target_sgtin">Gesuchte SGTIN</string>
     <string name="dup_epc">EPC</string>
+    <string name="dup_tid">TID</string>
     <string name="dup_store">Filiale</string>
     <string name="dup_proximity">Nähe</string>
     <string name="dup_hint_hold_trigger">Trigger gedrückt halten und Pistole schwenken</string>
@@ -67,7 +64,6 @@
     <string name="dup_continuous">Dauersuche</string>
     <string name="dup_continuous_sub">Suche ohne Trigger</string>
     <string name="dup_found_count">Gefunden (eindeutige TIDs)</string>
-    <string name="dup_last">Zuletzt</string>
     <string name="dup_confirm_find">Fund bestätigen</string>
     <string name="dup_end_search">Suche beenden</string>
     <string name="dup_msg_saved">Fund #%1$d gespeichert – Artikel entfernen</string>

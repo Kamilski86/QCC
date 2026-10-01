@@ -24,8 +24,6 @@
     <string name="qr_gtin">QR SGTIN</string>
     <string name="rfid_gtin">RFID SGTIN</string>
 
-    <string name="qr_scan">QR Scan</string>
-    <string name="rfid_scan">RFID Scan</string>
     <string name="reset">Reset</string>
 
     <string name="reader_settings">Reader Settings</string>
@@ -42,7 +40,6 @@
     <string name="manual_entry_question">Would you like to enter the GTIN manually?</string>
     <string name="tap_for_manual_entry">Manual Entry</string>
     <string name="enter_gtin">Enter GTIN</string>
-    <string name="apply">Apply</string>
     <string name="cancel">Cancel</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
@@ -63,12 +60,12 @@
     <string name="dup_target_hint">EPC or SGTIN</string>
     <string name="dup_sgtin_filter">Filter value (SGTIN)</string>
     <string name="dup_sgtin_filter_hint">Usually 1 (retail item). Only relevant for typed SGTIN.</string>
-    <string name="dup_read_with_reader">Read with reader</string>
     <string name="dup_hint_capture">Or pull the trigger with the item held to the reader</string>
     <string name="dup_store_optional">Store (optional)</string>
     <string name="dup_start_search">Start search</string>
     <string name="dup_target_sgtin">Target SGTIN</string>
     <string name="dup_epc">EPC</string>
+    <string name="dup_tid">TID</string>
     <string name="dup_store">Store</string>
     <string name="dup_proximity">proximity</string>
     <string name="dup_hint_hold_trigger">Hold trigger and sweep the reader</string>
@@ -76,7 +73,6 @@
     <string name="dup_continuous">Continuous search</string>
     <string name="dup_continuous_sub">Search without trigger</string>
     <string name="dup_found_count">Found (unique TIDs)</string>
-    <string name="dup_last">Last</string>
     <string name="dup_confirm_find">Confirm find</string>
     <string name="dup_end_search">End search</string>
     <string name="dup_msg_saved">Find #%1$d saved – remove the item</string>

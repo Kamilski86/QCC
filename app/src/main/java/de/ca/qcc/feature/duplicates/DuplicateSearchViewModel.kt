@@ -24,9 +24,12 @@ import javax.inject.Inject
 
 enum class DuplicatePhase { TARGET, SEARCH }
 
-// Shown as a dialog the user must dismiss, so it cannot be overlooked
+// Everything except plain success feedback is shown as a dialog the user must dismiss,
+// so a warning or error cannot be overlooked
 val DuplicateMessage.requiresAcknowledgement: Boolean
-    get() = this is DuplicateMessage.SavedAgain || this is DuplicateMessage.AlreadyFound
+    get() = this !is DuplicateMessage.Saved &&
+        this !is DuplicateMessage.Exported &&
+        this !is DuplicateMessage.NothingExported
 
 // Typed so the UI can localize; the ViewModel never builds user-visible text
 sealed interface DuplicateMessage {
@@ -143,12 +146,16 @@ class DuplicateSearchViewModel @Inject constructor(
 
     // ── Phase 1: target ──
 
+    // The target is derived while typing; an incomplete input simply has no target yet
     fun onInputChange(text: String) =
-        _uiState.update { it.copy(input = text, target = null, message = null) }
+        _uiState.update { it.copy(input = text, target = parseTarget(text, it.sgtinFilter), message = null) }
 
     // Only affects typed SGTINs; a hex EPC carries its own filter value
     fun onSgtinFilterChange(filter: Int) =
-        _uiState.update { it.copy(sgtinFilter = filter, target = null, message = null) }
+        _uiState.update { it.copy(sgtinFilter = filter, target = parseTarget(it.input, filter), message = null) }
+
+    private fun parseTarget(input: String, filter: Int): LocateTarget? =
+        runCatching { parser.parseLocateTarget(input, filter) }.getOrNull()
 
     fun onStoreChange(text: String) = _uiState.update { it.copy(store = text) }
 
@@ -185,9 +192,10 @@ class DuplicateSearchViewModel @Inject constructor(
     }
 
     fun startSearch() {
+        if (_uiState.value.busy || _uiState.value.phase != DuplicatePhase.TARGET) return
+        // No separate "apply" step: starting parses the input and reports it if invalid
+        val target = _uiState.value.target ?: run { applyInput(); _uiState.value.target } ?: return
         val state = _uiState.value
-        val target = state.target ?: return
-        if (state.busy || state.phase != DuplicatePhase.TARGET) return
         if (!state.readerConnected) {
             _uiState.update { it.copy(message = DuplicateMessage.ReaderNotConnected) }
             return

@@ -3,7 +3,9 @@ package de.ca.qcc.feature.duplicates
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -18,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -29,20 +32,27 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import de.ca.qcc.R
 import java.text.DateFormat
@@ -55,7 +65,6 @@ fun DuplicateSearchScreen(
     onInputChange: (String) -> Unit,
     onSgtinFilterChange: (Int) -> Unit,
     onApplyInput: () -> Unit,
-    onCapture: () -> Unit,
     onStoreChange: (String) -> Unit,
     onStartSearch: () -> Unit,
     onContinuousChange: (Boolean) -> Unit,
@@ -69,9 +78,22 @@ fun DuplicateSearchScreen(
         contentColor = Color.White
     )
 
+    // Warnings and errors block the screen until confirmed; plain success feedback is a
+    // snackbar so it never shifts the layout
     state.message?.takeIf { it.requiresAcknowledgement }?.let { MessageDialog(it, onMessageDismissed) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val plainMessage = state.message?.takeIf { !it.requiresAcknowledgement }
+    val plainText = plainMessage?.text()
+    LaunchedEffect(plainMessage) {
+        if (plainText != null) snackbarHostState.showSnackbar(plainText)
+    }
 
     Scaffold(
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) {
+                Snackbar(it, containerColor = Color.Black, contentColor = Color.White)
+            }
+        },
         topBar = {
             TopAppBar(
                 title = {
@@ -90,179 +112,193 @@ fun DuplicateSearchScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            state.message?.takeIf { !it.requiresAcknowledgement }
-                ?.let { message -> item(key = "message") { MessageCard(message) } }
-
-            if (state.phase == DuplicatePhase.TARGET) {
-                item(key = "input") {
-                    WhiteCard {
-                        OutlinedTextField(
-                            value = state.input,
-                            onValueChange = onInputChange,
-                            label = { Text(stringResource(R.string.dup_target_hint)) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(onDone = { onApplyInput() }),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        // Filter value only matters for a typed SGTIN (gcp.itemRef.serial)
-                        if (state.input.contains('.')) {
-                            Spacer(Modifier.height(8.dp))
-                            SgtinFilterSelector(
-                                selected = state.sgtinFilter,
-                                enabled = !state.busy,
-                                onSelect = onSgtinFilterChange
-                            )
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick = onApplyInput,
-                            enabled = state.input.isNotBlank(),
-                            colors = blackButtonColors,
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text(stringResource(R.string.apply)) }
-                        Button(
-                            onClick = onCapture,
-                            enabled = state.readerConnected && !state.busy,
-                            colors = blackButtonColors,
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text(stringResource(R.string.dup_read_with_reader)) }
-                        Text(
-                            stringResource(R.string.dup_hint_capture),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color.Black
-                        )
-                    }
-                }
-                state.target?.let { target ->
-                    item(key = "target") {
-                        WhiteCard {
-                            LabeledValue(stringResource(R.string.dup_target_sgtin), target.sgtin)
-                            LabeledValue(stringResource(R.string.dup_epc), target.epc, monospace = true)
-                        }
-                    }
-                }
-                item(key = "store") {
-                    WhiteCard {
-                        OutlinedTextField(
-                            value = state.store,
-                            onValueChange = onStoreChange,
-                            label = { Text(stringResource(R.string.dup_store_optional)) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-                item(key = "start") {
-                    Button(
-                        onClick = onStartSearch,
-                        enabled = state.target != null && state.readerConnected && !state.busy,
-                        colors = blackButtonColors,
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(stringResource(R.string.dup_start_search)) }
-                }
-            } else {
-                val target = state.target
-                if (target != null) {
-                    item(key = "targetInfo") {
-                        WhiteCard {
-                            LabeledValue(stringResource(R.string.dup_target_sgtin), target.sgtin)
-                            LabeledValue(stringResource(R.string.dup_epc), target.epc, monospace = true)
-                            if (state.store.isNotBlank()) {
-                                LabeledValue(stringResource(R.string.dup_store), state.store)
-                            }
-                        }
-                    }
-                }
-                item(key = "gauge") {
-                    WhiteCard {
-                        ProximityGauge(proximity = state.proximity, active = state.locating)
-                        Text(
-                            stringResource(
-                                if (state.continuous) R.string.dup_hint_continuous else R.string.dup_hint_hold_trigger
-                            ),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF555555),
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        )
-                    }
-                }
-                item(key = "continuous") {
-                    WhiteCard {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .toggleable(
-                                    value = state.continuous,
-                                    enabled = !state.busy,
-                                    role = Role.Switch,
-                                    onValueChange = onContinuousChange
-                                )
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(stringResource(R.string.dup_continuous), color = Color.Black, fontWeight = FontWeight.Medium)
-                                Text(
-                                    stringResource(R.string.dup_continuous_sub),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF555555)
-                                )
-                            }
-                            Switch(
-                                checked = state.continuous,
-                                onCheckedChange = null,
-                                enabled = !state.busy,
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color.White,
-                                    checkedTrackColor = Color.Black
-                                )
-                            )
-                        }
-                    }
-                }
-                item(key = "counters") {
-                    WhiteCard {
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Column(Modifier.weight(1f)) {
-                                Text(stringResource(R.string.dup_found_count), style = MaterialTheme.typography.labelSmall, color = Color.Black)
-                                Text("${state.foundCount}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.Black)
-                            }
-                            state.lastTid?.let { tid ->
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(stringResource(R.string.dup_last), style = MaterialTheme.typography.labelSmall, color = Color.Black)
-                                    Text(tid.shortTid(), fontFamily = FontFamily.Monospace, color = Color.Black)
-                                }
-                            }
-                        }
-                    }
-                }
-                item(key = "confirm") {
-                    Button(
-                        onClick = onConfirmFind,
-                        enabled = !state.busy,
-                        colors = blackButtonColors,
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(stringResource(R.string.dup_confirm_find)) }
-                }
-                item(key = "end") {
-                    Button(
-                        onClick = onEndSearch,
-                        enabled = !state.busy,
-                        colors = blackButtonColors,
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(stringResource(R.string.dup_end_search)) }
-                }
-            }
+        if (state.phase == DuplicatePhase.TARGET) {
+            TargetPhase(
+                state, onInputChange, onSgtinFilterChange, onApplyInput, onStoreChange, onStartSearch,
+                blackButtonColors, Modifier.padding(padding)
+            )
+        } else {
+            SearchPhase(
+                state, onContinuousChange, onConfirmFind, onEndSearch, blackButtonColors, Modifier.padding(padding)
+            )
         }
     }
 }
+
+// The keyboard can take most of the screen here, so this phase may scroll
+@Composable
+private fun TargetPhase(
+    state: DuplicateUiState,
+    onInputChange: (String) -> Unit,
+    onSgtinFilterChange: (Int) -> Unit,
+    onApplyInput: () -> Unit,
+    onStoreChange: (String) -> Unit,
+    onStartSearch: () -> Unit,
+    blackButtonColors: ButtonColors,
+    modifier: Modifier
+) {
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item(key = "input") {
+            WhiteCard {
+                OutlinedTextField(
+                    value = state.input,
+                    onValueChange = onInputChange,
+                    label = { Text(stringResource(R.string.dup_target_hint)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onApplyInput() }),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                // Filter value only matters for a typed SGTIN (gcp.itemRef.serial)
+                if (state.input.contains('.')) {
+                    Spacer(Modifier.height(8.dp))
+                    SgtinFilterSelector(
+                        selected = state.sgtinFilter,
+                        enabled = !state.busy,
+                        onSelect = onSgtinFilterChange
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.dup_hint_capture),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Black
+                )
+            }
+        }
+        state.target?.let { target ->
+            item(key = "target") {
+                WhiteCard {
+                    LabeledValue(stringResource(R.string.dup_target_sgtin), target.sgtin)
+                    LabeledValue(stringResource(R.string.dup_epc), target.epc, monospace = true)
+                }
+            }
+        }
+        item(key = "store") {
+            WhiteCard {
+                OutlinedTextField(
+                    value = state.store,
+                    onValueChange = onStoreChange,
+                    label = { Text(stringResource(R.string.dup_store_optional)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+        item(key = "start") {
+            Button(
+                onClick = onStartSearch,
+                enabled = state.input.isNotBlank() && state.readerConnected && !state.busy,
+                colors = blackButtonColors,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text(stringResource(R.string.dup_start_search)) }
+        }
+    }
+}
+
+// Everything must be visible at once: no scrolling while the user works with the trigger.
+// The cards keep their look; the gauge takes whatever height is left.
+@Composable
+private fun SearchPhase(
+    state: DuplicateUiState,
+    onContinuousChange: (Boolean) -> Unit,
+    onConfirmFind: () -> Unit,
+    onEndSearch: () -> Unit,
+    blackButtonColors: ButtonColors,
+    modifier: Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        state.target?.let { target ->
+            WhiteCard(padding = COMPACT_CARD_PADDING) {
+                LabeledValue(stringResource(R.string.dup_target_sgtin), target.sgtin, compact = true)
+                LabeledValue(stringResource(R.string.dup_epc), target.epc, monospace = true, compact = true)
+                LabeledValue(stringResource(R.string.dup_tid), state.lastTid ?: "-", monospace = true, compact = true)
+                if (state.store.isNotBlank()) {
+                    LabeledValue(stringResource(R.string.dup_store), state.store, compact = true)
+                }
+            }
+        }
+        WhiteCard(modifier = Modifier.weight(1f), padding = COMPACT_CARD_PADDING, fillHeight = true) {
+            Box(
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                ProximityGauge(
+                    proximity = state.proximity,
+                    active = state.locating,
+                    modifier = Modifier.testTag("gauge")
+                )
+            }
+            Text(
+                stringResource(
+                    if (state.continuous) R.string.dup_hint_continuous else R.string.dup_hint_hold_trigger
+                ),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF555555),
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+        }
+        WhiteCard(padding = COMPACT_CARD_PADDING) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .toggleable(
+                        value = state.continuous,
+                        enabled = !state.busy,
+                        role = Role.Switch,
+                        onValueChange = onContinuousChange
+                    )
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.dup_continuous), color = Color.Black, fontWeight = FontWeight.Medium)
+                    Text(
+                        stringResource(R.string.dup_continuous_sub),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF555555)
+                    )
+                }
+                Switch(
+                    checked = state.continuous,
+                    onCheckedChange = null,
+                    enabled = !state.busy,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Color.Black
+                    )
+                )
+            }
+        }
+        WhiteCard(padding = COMPACT_CARD_PADDING) {
+            Text(stringResource(R.string.dup_found_count), style = MaterialTheme.typography.labelSmall, color = Color.Black)
+            Text("${state.foundCount}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.Black)
+        }
+        Button(
+            onClick = onConfirmFind,
+            enabled = !state.busy,
+            colors = blackButtonColors,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(stringResource(R.string.dup_confirm_find)) }
+        Button(
+            onClick = onEndSearch,
+            enabled = !state.busy,
+            colors = blackButtonColors,
+            modifier = Modifier.fillMaxWidth()
+        ) { Text(stringResource(R.string.dup_end_search)) }
+    }
+}
+
+private val COMPACT_CARD_PADDING = 8.dp
 
 // Cannot be overlooked and blocks the screen until confirmed with OK
 @Composable
@@ -282,12 +318,20 @@ private fun MessageDialog(message: DuplicateMessage, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun WhiteCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+private fun WhiteCard(
+    modifier: Modifier = Modifier,
+    padding: Dp = 16.dp,
+    fillHeight: Boolean = false,
+    content: @Composable ColumnScope.() -> Unit
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Column(modifier = Modifier.padding(16.dp), content = content)
+        Column(
+            modifier = Modifier.padding(padding).then(if (fillHeight) Modifier.fillMaxSize() else Modifier),
+            content = content
+        )
     }
 }
 
@@ -324,7 +368,7 @@ private fun SgtinFilterSelector(selected: Int, enabled: Boolean, onSelect: (Int)
 }
 
 @Composable
-private fun LabeledValue(label: String, value: String, monospace: Boolean = false) {
+private fun LabeledValue(label: String, value: String, monospace: Boolean = false, compact: Boolean = false) {
     Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Black)
     Text(
         value,
@@ -333,21 +377,7 @@ private fun LabeledValue(label: String, value: String, monospace: Boolean = fals
         fontFamily = if (monospace) FontFamily.Monospace else null,
         color = Color.Black
     )
-    Spacer(Modifier.height(6.dp))
-}
-
-@Composable
-private fun MessageCard(message: DuplicateMessage) {
-    val isError = message !is DuplicateMessage.Saved &&
-        message !is DuplicateMessage.Exported &&
-        message !is DuplicateMessage.NothingExported
-    WhiteCard {
-        Text(
-            message.text(),
-            color = if (isError) Color.Red else Color.Black,
-            fontWeight = FontWeight.Medium
-        )
-    }
+    Spacer(Modifier.height(if (compact) 0.dp else 6.dp))
 }
 
 @Composable
@@ -376,5 +406,3 @@ private fun DuplicateMessage.text(): String = when (this) {
     DuplicateMessage.NothingExported -> stringResource(R.string.dup_msg_nothing_exported)
     is DuplicateMessage.ExportFailed -> stringResource(R.string.dup_msg_export_failed, detail)
 }
-
-private fun String.shortTid(): String = if (length > 10) "${take(4)}…${takeLast(4)}" else this
