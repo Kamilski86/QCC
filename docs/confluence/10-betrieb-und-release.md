@@ -10,8 +10,8 @@
 
 | Umgebung | Beschreibung |
 |---|---|
-| Entwicklung | Android Studio / Gradle, Debug-Build, Installation per USB auf das CT37 |
-| Test | dasselbe CT37 + RFD8500; keine separate Testumgebung, kein CI **[zu bestätigen]** |
+| Entwicklung | Android Studio / Gradle, Debug-Build, Installation per USB auf das CT37; mit angeschlossenem IH45 ist der USB-Port belegt → **WLAN-adb** (`adb tcpip 5555`, `adb connect <IP>:5555`, Seite 08) |
+| Test | dasselbe CT37 + RFD8500 bzw. IH45; keine separate Testumgebung, kein CI **[zu bestätigen]** |
 | Produktion | Auslieferungsweg (MDM, Store, manuelle APK-Installation) **[zu bestätigen]** |
 
 Es gibt keine Backend-Systeme; die App ist offline.
@@ -21,16 +21,18 @@ Es gibt keine Backend-Systeme; die App ist offline.
 | Variante | Status | Hinweis |
 |---|---|---|
 | `debug` | ✅ baut, läuft auf CT37 | `applicationId de.ca.qcc`, Schemata als Assets (für Tests) |
-| `release` | ✅ baut, ✅ **signiert** (seit 2026-10-01) | R8 mit `proguard-rules.pro`; Ausgabe `app/build/outputs/apk/release/app-release.apk` (ca. 12 MB, Signatur v2 verifiziert). Ohne `keystore.properties` entsteht `app-release-unsigned.apk`. Start auf dem CT37 geprüft; **Funktionstest mit Reader/Scan/Export steht aus** |
+| `release` | ✅ baut, ✅ **signiert** (seit 2026-10-01) | R8 mit `proguard-rules.pro`; Ausgabe `app/build/outputs/apk/release/app-release.apk` (ca. 12 MB, Signatur v2 verifiziert). Ohne `keystore.properties` entsteht `app-release-unsigned.apk`. Start auf dem CT37 geprüft (vor der IH45-Einbindung); **Funktionstest mit Reader/Scan/Export steht aus, mit IH45 noch gar nicht getestet** |
 
 **Release-Build-Konfiguration (erledigt 2026-10-01):** Ursache des früheren Fehlers war ein von Zebras SDK referenziertes, nicht öffentliches Android-Klassenobjekt (`android.os.ServiceManager`). `app/proguard-rules.pro` enthält nun
 1. `-dontwarn android.os.ServiceManager`,
 2. `-keep class com.zebra.** { *; }` und `-keep class com.honeywell.** { *; }` – die Zebra-AARs liefern leere Consumer-Rules, Honeywell bündelt JNI-Bibliotheken (`libhedc.so`), die an Klassennamen gebunden sind; ohne Keep benennt R8 z. B. `RFIDReader` in `a6.u` um,
 3. `-dontwarn` für nicht genutzte Zebra-Transporte (`com.jcraft.jsch`, `fi.iki.elonen`, `org.apache.xerces`, `org.bouncycastle`, `org.java_websocket`).
+4. **Honeywell-RFID-SDK (IH45), ergänzt 2026-10-01:** Keep-Regeln für `com.uhf.**`, `com.silionmodule.**`, `com.bth.**`, `com.communication.**`, `com.usb.**` sowie die obfuskierten Ein-Buchstaben-Pakete `a.**` bis `u.**` (das SDK liefert keine Consumer-Rules; JNI – `libModuleAPIJni.so`, `libSerialPort.so`, `libHonUpgrade.so` – ist an Klassennamen gebunden). **Das Release-Build baut, ist aber mit IH45 auf dem Gerät noch nicht getestet.**
+5. **Build-Abhängigkeit:** `API3_LLRP*` wird aus den Zebra-AARs ausgeschlossen (Klassenkollision `a.a` mit dem Honeywell-SDK). Ein Regressionstest des RFD8500 auf dem Gerät nach dieser Änderung steht aus.
 
 **Noch erforderlich vor Auslieferung:**
 1. ~~Signierung einrichten~~ – **erledigt**, siehe Abschnitt 4.
-2. **Funktionstest des signierten Release-Builds** auf dem CT37 (Reader verbinden, QCC-Scan, Duplicate Finder, CSV-Export), da Minifizierung Hilt/Room/SDK-Aufrufe beeinflussen kann.
+2. **Funktionstest des signierten Release-Builds** auf dem CT37 (Reader verbinden – **sowohl RFD8500 als auch IH45**, QCC-Scan, Duplicate Finder, CSV-Export), da Minifizierung Hilt/Room/SDK-Aufrufe beeinflussen kann; dazu gehört der Regressionstest des RFD8500 nach dem Ausschluss von `API3_LLRP`.
 3. Verteilungsweg festlegen (Seite 13, O-04).
 
 > **Parallel-Test des Release-Builds:** Eine Release-Variante mit Debug-Signatur und `applicationIdSuffix ".rel"` lässt sich lokal parallel zur Debug-App installieren (z. B. per Gradle-Init-Skript, ohne das Repository zu ändern). Dabei Reader und Scanner nur von **einer** App gleichzeitig nutzen.
@@ -48,7 +50,7 @@ Eine bestehende Installation wird ersetzt, **Daten bleiben erhalten**; die Daten
 
 ### Voraussetzungen am Gerät
 - Android 9+ (API 28) – getestet auf **CT37 mit Android 14**.
-- Bluetooth an; RFD8500 gekoppelt; Berechtigung „Nearby devices“ (Android 12+) beim ersten Start erteilen.
+- RFID-Reader: **IH45 per USB** am CT37 (keine Kopplung nötig) **oder** Bluetooth an und RFD8500 gekoppelt; Berechtigung „Nearby devices“ (Android 12+) beim ersten Start erteilen. Der IH45 hat Vorrang, solange er steckt.
 - Für den CSV-Export: Ordner *Documents* verfügbar (Android 10+ über MediaStore ohne Zusatzberechtigung; **API 28** bräuchte `WRITE_EXTERNAL_STORAGE`, im Manifest nicht deklariert).
 
 ### Deinstallation / Datenverlust
@@ -104,15 +106,21 @@ shasum -a 256 app/build/outputs/apk/release/app-release.apk    # Prüfsumme für
 
 ## 7 Release Notes
 
-### Version 0.1.0 (Stand 2026-10-01, Branch `fix/duplicate-finder-ux`, noch nicht in `main` gemergt)
+### Version 0.1.0 (Stand 2026-10-01, Branch `feature/honeywell-ih45` auf Basis von `fix/duplicate-finder-ux`, noch nicht in `main` gemergt)
 
 **Neu**
+- **Honeywell IH45 als zweiter RFID-Reader** (USB, Honeywell RFID SDK): Auto-Connect, automatische Umschaltung Zebra ↔ IH45 (`SwitchingRfidReaderGateway`), immer volle Leistung mit Auswahl des stärksten Tags nach RSSI, Ortung mit Leistungsstufen im Nahfeld (ADR-20).
+- **Duplikatsuche ohne dritte Hand** (beide Reader): Trigger am Tag loslassen bestätigt den Fund, Trigger-Druck schließt Dialoge, heller Bestätigungston bzw. Warnton (ADR-21).
+- **Reader-Anzeige**: grünes Antennen-Icon oben rechts, Toast beim Verbinden/Trennen.
+- **Diagnose-Ansicht „IH45 diagnostics“** (Drawer, temporär, nur englisch).
 - **Duplikatsuche („Find duplicates“)**: Ziel per Anlesen, EPC oder SGTIN (Filterwert 0–7 wählbar); Ortung mit Tacho, Beep und Vibration; TID-Erfassung per „Confirm find“; Dauersuche; CSV-Export bei „End search“; offene Suche wird fortgesetzt.
 - **Wiederfunde**: Tags, die in einer früheren Suche gefunden wurden und erneut auftauchen, zählen erneut und tragen das Datum des Vorfunds (Dialog und CSV-Spalte „Previously Found“).
 - **Dashboard**: Button „Find duplicates“.
 - Popups (Dialog mit OK) für Warnungen und Fehler im Duplicate Finder.
 
 **Geändert**
+- Meldung „Kein Zebra-Reader gefunden“ → „Kein RFID-Reader gefunden“; Hinweistext der Duplikatsuche (`dup_hint_hold_trigger`): „Trigger halten, zum Tag führen, am Tag loslassen = bestätigen“.
+- Build: `vendor/honeywell/*.aar` eingebunden, `API3_LLRP*` ausgeschlossen, ProGuard-Regeln für das Honeywell-SDK; Manifest: `ACCESS_FINE_LOCATION` (`maxSdkVersion 30`); Log-Tags `QccIh45`, `QccCt37`, `QccIh45Probe`.
 - **Release-Build** funktioniert (R8-Regeln für die Vendor-SDKs) und wird **signiert** (Keystore außerhalb des Repositories).
 - Vergleich über **GTIN-14 + Seriennummer** statt über den Punkt-String (unabhängig von der Company-Prefix-Länge).
 - Reader-Screen: Sendeleistung als „Level n of 30“ mit Hinweistext statt irreführend „dBm“.
@@ -130,15 +138,17 @@ shasum -a 256 app/build/outputs/apk/release/app-release.apk    # Prüfsumme für
 - Zuletzt gelesene TID ging beim Wiederöffnen einer offenen Suche verloren.
 
 **Bekannte Probleme**
-- Funktionstest des signierten Release-Builds (Reader, Scan, Export) steht aus (siehe Abschnitt 2).
+- Funktionstest des signierten Release-Builds (Reader, Scan, Export) steht aus, **mit IH45 und nach dem `API3_LLRP`-Ausschluss auch der RFD8500-Regressionstest** (siehe Abschnitt 2).
+- Die USB-Verbindung des IH45 reißt gelegentlich ab (`USB detached`, Ursache unbekannt); Bluetooth-Anbindung des IH45 nicht umgesetzt (Kopplung wird abgelehnt).
+- Die Diagnose-Ansicht ist temporär und soll entfernt werden.
 - Test mit **zwei gleichzeitig gehaltenen Duplikaten** steht aus.
 
 ## 8 Betrieb und Support
 
 | Thema | Ist / Empfehlung |
 |---|---|
-| Monitoring / Crash-Reporting | keines; Logging nur per Logcat (`QccZebra`) |
-| Support-Information bei Störungen | Build/Commit, Gerät, Android-Version, Repro-Schritte, `adb logcat -s QccZebra`, ggf. Exportdateien (Seite 09, Abschnitt 7) |
+| Monitoring / Crash-Reporting | keines; Logging nur per Logcat (`QccZebra`, `QccIh45`, `QccCt37`) |
+| Support-Information bei Störungen | Build/Commit, Gerät, verwendeter Reader (Zebra/IH45), Android-Version, Repro-Schritte, `adb logcat -s QccZebra QccIh45 QccCt37`, ggf. Exportdateien (Seite 09, Abschnitt 7) |
 | Datensicherung | lokale DB (`/data/data/de.ca.qcc/databases/qcc.db`) per Android-Backup möglich (siehe Seite 11); **CSV-Exporte** sind die vorgesehene Auswertungsquelle |
 | Datenabzug | Dateimanager → *Documents* → `scans_*.csv`, `duplicates_*.csv`; per USB/MTP oder E-Mail/MDM |
 | Zeit/Datum | Zeitstempel und „heute“ folgen Gerätezeit/-zeitzone; falsche Gerätezeit verfälscht Tageszähler und CSV |

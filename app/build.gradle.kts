@@ -124,5 +124,8 @@ dependencies {
 
     // Local AAR files
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.aar"))))
-    implementation(fileTree(mapOf("dir" to "../vendor/zebra", "include" to listOf("*.aar"))))
+    // API3_LLRP (network readers only) is excluded: its obfuscated class a.a collides with the
+    // Honeywell RFID SDK. The Bluetooth RFD8500 does not use LLRP.
+    implementation(fileTree(mapOf("dir" to "../vendor/zebra", "include" to listOf("*.aar"), "exclude" to listOf("API3_LLRP*"))))
+    implementation(fileTree(mapOf("dir" to "../vendor/honeywell", "include" to listOf("*.aar"))))
 }

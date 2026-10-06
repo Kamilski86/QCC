@@ -77,6 +77,8 @@ class FakeDuplicateReader : RfidReaderGateway {
 class FakeProximityFeedback : ProximityFeedback {
     val updates = mutableListOf<Int>()
     var stopCount = 0
+    val resultTones = mutableListOf<Boolean>()
+    override fun resultTone(success: Boolean) { resultTones += success }
     override fun update(proximity: Int) { updates += proximity }
     override fun stop() { stopCount++ }
     override fun release() = Unit

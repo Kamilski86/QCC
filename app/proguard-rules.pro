@@ -14,3 +14,12 @@
 -dontwarn org.apache.xerces.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.java_websocket.**
+
+# Honeywell RFID SDK (IH45): ModuleAPI JNI is bound to class names, the SDK ships no consumer rules
+# and its internals are obfuscated into single-letter top-level packages (a..u).
+-keep class com.uhf.** { *; }
+-keep class com.silionmodule.** { *; }
+-keep class com.bth.** { *; }
+-keep class com.communication.** { *; }
+-keep class com.usb.** { *; }
+-keep class a.**, b.**, c.**, d.**, e.**, f.**, g.**, h.**, i.**, j.**, k.**, l.**, m.**, n.**, o.**, p.**, q.**, r.**, s.**, t.**, u.** { *; }

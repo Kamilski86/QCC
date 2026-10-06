@@ -3,6 +3,9 @@
 
 
     <string name="dashboard">Dashboard</string>
+    <string name="reader_connected_toast">%1$s connected</string>
+    <string name="reader_disconnected_toast">RFID reader disconnected</string>
+    <string name="reader_connected_icon">RFID reader connected: %1$s</string>
     <string name="reader">Reader</string>
     <string name="language">Language</string>
     <string name="about">About</string>
@@ -45,7 +48,7 @@
     <string name="dup_tid">TID</string>
     <string name="dup_store">Store</string>
     <string name="dup_proximity">proximity</string>
-    <string name="dup_hint_hold_trigger">Hold trigger and sweep the reader</string>
+    <string name="dup_hint_hold_trigger">Hold trigger, move to the tag, release at the tag to confirm</string>
     <string name="dup_hint_continuous">Continuous search active – sweep the reader</string>
     <string name="dup_continuous">Continuous search</string>
     <string name="dup_continuous_sub">Search without trigger</string>

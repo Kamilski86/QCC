@@ -276,6 +276,67 @@ class DuplicateSearchViewModelTest {
     }
 
     @Test
+    fun releasingTheTriggerAtTheTag_confirmsTheFind() = runTest {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        reader.tidsNearby = Result.success(listOf(tid))
+
+        reader.trigger.emit(true)
+        reader.proximity.emit(97)
+        reader.trigger.emit(false)
+
+        assertEquals(1, vm.uiState.value.foundCount)
+        assertEquals(DuplicateMessage.Saved(1), vm.uiState.value.message)
+        assertEquals(listOf(true), feedback.resultTones)
+    }
+
+    @Test
+    fun releasingTheTriggerAwayFromTheTag_onlyStopsLocating() = runTest {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        reader.tidsNearby = Result.success(listOf(tid))
+
+        reader.trigger.emit(true)
+        reader.proximity.emit(94)
+        reader.trigger.emit(false)
+
+        assertEquals(0, vm.uiState.value.foundCount)
+        assertNull(vm.uiState.value.message)
+        assertTrue(feedback.resultTones.isEmpty())
+    }
+
+    @Test
+    fun anUnsuccessfulConfirm_playsTheWarningTone() = runTest {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        reader.tidsNearby = Result.success(emptyList())
+
+        reader.trigger.emit(true)
+        reader.proximity.emit(100)
+        reader.trigger.emit(false)
+
+        assertEquals(DuplicateMessage.NoTagAtReader, vm.uiState.value.message)
+        assertEquals(listOf(false), feedback.resultTones)
+    }
+
+    @Test
+    fun triggerPress_dismissesADialog_andDoesNotStartLocating() = runTest {
+        val vm = createViewModel()
+        vm.startSearchFor(epc)
+        reader.tidsNearby = Result.success(emptyList())
+        vm.confirmFind()
+        assertEquals(DuplicateMessage.NoTagAtReader, vm.uiState.value.message)
+
+        reader.trigger.emit(true)
+
+        assertNull(vm.uiState.value.message)
+        assertFalse(vm.uiState.value.locating)
+        // The matching release must not confirm anything either
+        reader.trigger.emit(false)
+        assertEquals(0, vm.uiState.value.foundCount)
+    }
+
+    @Test
     fun continuousSearch_runsWithoutTrigger_andIgnoresRelease() = runTest {
         val vm = createViewModel()
         vm.startSearchFor(epc)

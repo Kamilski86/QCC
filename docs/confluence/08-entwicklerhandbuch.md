@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Stand** | 2026-10-01 |
-| **Quellen** | `SETUP.md`, `CLAUDE.md`, `AGENTS.md`, `app/build.gradle.kts`, Git-Historie |
+| **Quellen** | `SETUP.md`, `CLAUDE.md`, `AGENTS.md`, `app/build.gradle.kts`, `app/proguard-rules.pro`, Git-Historie, Hardware-Abnahme IH45 (2026-10-01) |
 
 ## 1 Toolchain und Versionen
 
@@ -27,10 +27,11 @@
 
 1. **Android Studio** in einer **aktuellen stabilen Version** installieren (SETUP.md nennt Hedgehog 2023.1 als Untergrenze; das eingesetzte AGP 8.13.2 setzt eine entsprechend neue Android-Studio-Version voraus) – mit JDK 17.
 2. Repository klonen (`origin`: `https://github.com/Kamilski86/QCC.git`) und den Projektordner öffnen; Gradle-Sync abwarten (bei Problemen *Invalidate Caches / Restart* oder `./gradlew clean`).
-3. **Vendor-SDKs** liegen im Repository (`app/libs/*.aar`, `vendor/zebra/*.aar`) und werden per `fileTree` eingebunden – kein Download nötig.
-4. Gerät: CT37 per USB, **USB-Debugging** aktivieren (Einstellungen → Über das Telefon → Build-Nummer 7× tippen → Entwickleroptionen). Zebra RFD8500 koppeln.
+3. **Vendor-SDKs** liegen im Repository (`app/libs/*.aar`, `vendor/zebra/*.aar`, `vendor/honeywell/honeywell_rfid_sdk_v01.01.03.04.11.aar`) und werden per `fileTree` eingebunden – kein Download nötig. Aus `vendor/zebra` wird `API3_LLRP*` **ausgeschlossen** (`exclude`), weil seine obfuskierte Klasse `a.a` mit dem Honeywell-SDK kollidiert („Duplicate class a.a“); LLRP braucht nur ein Netzwerk-Reader. Das Honeywell-AAR ist von Honeywell signiert; die Lizenz zur Weitergabe wurde vom Product Owner freigegeben (im Git eingecheckt).
+4. Gerät: CT37 mit **USB-Debugging** (Einstellungen → Über das Telefon → Build-Nummer 7× tippen → Entwickleroptionen). Zebra RFD8500 koppeln – oder den **IH45 per USB** anschließen (keine Kopplung).
+5. **adb bei angeschlossenem IH45:** Der USB-Port des CT37 ist durch den IH45 belegt, daher **WLAN-adb** verwenden: einmalig mit Kabel `adb tcpip 5555`, dann `adb connect <IP>:5555` (IP des CT37 im WLAN); danach das Kabel durch den IH45 ersetzen.
 
-> Ohne Hardware (CT37 + RFD8500) lässt sich die App nur eingeschränkt testen; es gibt **kein Emulator-Ziel**. Unit-Tests laufen ohne Hardware.
+> Ohne Hardware (CT37 + RFD8500 oder IH45) lässt sich die App nur eingeschränkt testen; es gibt **kein Emulator-Ziel**. Unit-Tests laufen ohne Hardware.
 
 ## 3 Build- und Prüfbefehle (im Repo-Stamm)
 
@@ -52,7 +53,7 @@ Mehrere Geräte: `ANDROID_SERIAL=<seriennummer> ./gradlew installDebug`; Geräte
 |---|---|
 | `./gradlew lintDebug` stürzt ab | „Exception occurred when reading Kotlin metadata“ – auch auf dem Baseline-Commit `499466a`; nicht durch Feature-Arbeit verursacht |
 | Lint-Befunde | 8 alte `MissingTranslation`-Fehler (z. B. `cancel`, `actions`, …) unbehoben |
-| `assembleRelease` | **behoben (2026-10-01)**: `app/proguard-rules.pro` hält `com.zebra.**` und `com.honeywell.**` unobfuskiert (Honeywell bündelt JNI-Bibliotheken) und unterdrückt Warnungen für nicht genutzte Zebra-Transporte (JSch, NanoHTTPD, Xerces, BouncyCastle, WebSocket). Die Datei ist jetzt **Pflichtbestandteil** des Release-Builds. Ergebnis: `app-release.apk` (signiert, ca. 12 MB) bzw. `app-release-unsigned.apk` ohne Keystore |
+| `assembleRelease` | **behoben (2026-10-01)**: `app/proguard-rules.pro` hält `com.zebra.**` und `com.honeywell.**` unobfuskiert (Honeywell bündelt JNI-Bibliotheken) und unterdrückt Warnungen für nicht genutzte Zebra-Transporte (JSch, NanoHTTPD, Xerces, BouncyCastle, WebSocket). Für das **Honeywell-RFID-SDK (IH45)** kommen Keep-Regeln für `com.uhf.**`, `com.silionmodule.**`, `com.bth.**`, `com.communication.**`, `com.usb.**` und die obfuskierten Ein-Buchstaben-Pakete `a.**` … `u.**` hinzu (JNI ist an Klassennamen gebunden). Die Datei ist **Pflichtbestandteil** des Release-Builds. Der Release-Build mit IH45 baut, ist aber **auf dem Gerät noch nicht getestet** (Seite 10). Ergebnis: `app-release.apk` (signiert, ca. 12 MB) bzw. `app-release-unsigned.apk` ohne Keystore |
 | Release-Signierung | konfiguriert (2026-10-01): `app/build.gradle.kts` liest die git-ignorierte `keystore.properties` (Keystore außerhalb des Repos). Ohne diese Datei entsteht ein **unsigniertes** APK. Details und Schlüsselverwaltung: Seite 10, Abschnitt 4 |
 
 ## 4 Projektstruktur
@@ -63,6 +64,7 @@ Siehe [05 Architektur](05-architektur.md), Abschnitt „Paketstruktur“. Wichti
 |---|---|
 | `app/schemas/de.ca.qcc.data.local.AppDatabase/` | exportierte Room-Schemata (6, 7, 8); in `debug` als Assets für `MigrationTest` eingebunden |
 | `app/src/test/…/testutil/DuplicateFakes.kt` | Test-Fakes (`FakeDuplicateReader`, `FakeCsvWriter`, `FakeProximityFeedback`, `inMemoryDb`) |
+| `vendor/honeywell/` | Honeywell RFID SDK (AAR) für den IH45 |
 | `docs/confluence/` | diese Dokumentation |
 | `docs/superpowers/specs`, `…/plans` | Design-Spec und Umsetzungsplan des Duplicate Finders |
 | `tasks/todo.md` | Aufgabenplan der laufenden Arbeit (siehe Workflow) |
@@ -97,20 +99,22 @@ Regel im `CompareScansUseCase` oder Parser verorten, Negativtest ergänzen, Seit
 Siehe Seite 06, Abschnitt 4. Beispiel `MIGRATION_7_8` und `MigrationTest.migrate7To8_…`.
 
 ### 6.4 Neue Gateway-Funktion
-`RfidReaderGateway` mit Default-Implementierung erweitern → `ZebraRfd8500Gateway` → `FakeDuplicateReader` → Test.
+`RfidReaderGateway` mit Default-Implementierung erweitern → `ZebraRfd8500Gateway` **und** `HoneywellIh45Gateway` → Durchreichen in `SwitchingRfidReaderGateway` → `FakeDuplicateReader` → Test.
 
 ## 7 Debugging
 
 | Symptom | Prüfen |
 |---|---|
 | Scanner liefert keine Daten | Honeywell-Lifecycle in `MainActivity` (`claim/release`); Triggerpfad `ScanViewModel.triggerQrScan`; ist `ScanViewModel` **suspended** (Duplicates-Route offen)? |
-| RFID liefert kein Ergebnis | `observeStatus()`; Reconnect; **Trigger-Modus** (Logcat `QccZebra`: `triggerMode X -> Y`); `Inventory.perform failed` |
+| RFID liefert kein Ergebnis | `observeStatus()`; Reconnect; **Trigger-Modus** (Logcat `QccZebra`: `triggerMode X -> Y`); `Inventory.perform failed`; welcher Reader ist aktiv (Antennen-Icon, Toast, Log `QccIh45`)? |
+| IH45 verbindet nicht | USB-Kabel (`attachedUsbDevice`), Log `QccIh45` (`connecting`, `device up`, `creating reader`); Wartezeiten bis 3 s (Suche) bzw. 10 s (Hintergrund-Check) nach dem Start; nicht gleichzeitig die Diagnose-Ansicht benutzen (zweiter `RfidManager`-Listener) |
+| IH45 liest nichts / falsches Tag | RSSI-Schwellen (`QCC_MIN_RSSI`, `NEARBY_MIN_RSSI`, `NEARBY_MARGIN_DB`), Log `nearby candidates=…`; Leistung nur ohne laufendes Lesen setzbar |
 | Trigger im Dashboard tot nach Duplicates | Log `releaseTriggerMode ignored: … no longer owns the trigger` vs. fehlendes Release; `locateActive`/`inventoryActive` in der Moduswechsel-Zeile |
 | Ortung stoppt nicht | `TagLocationing.Stop failed` im Log |
 | Vergleich startet nicht | `ScanUiState.qr`/`rfid` gesetzt? `error`-Feld; Parser-Meldung |
 | Nahbereichs-Lesen liefert nichts | Leistungsindex (5 %, min. 15), 700-ms-Fenster, `Reader beschäftigt` |
 
-**Logcat:** `adb logcat -s QccZebra` (Moduswechsel mit Zustand, fehlgeschlagene Inventory-/Locate-Aufrufe, Besitzer-Freigabe).
+**Logcat:** `adb logcat -s QccZebra QccIh45 QccCt37 QccIh45Probe` (Zebra: Moduswechsel mit Zustand, fehlgeschlagene Inventory-/Locate-Aufrufe, Besitzer-Freigabe; `QccIh45`: IH45-Gateway; `QccCt37`: Scanner `triggerScan`, Barcode gelesen/Fehler; `QccIh45Probe`: Diagnose). Der IH45 meldet jedes Tag viele Male pro Sekunde – Log-Ausgaben entsprechend filtern.
 
 ## 8 Tests ausführen
 
@@ -123,6 +127,6 @@ Das Projekt wird mit KI-Agenten (Claude Code) entwickelt. Leitplanken: `CLAUDE.m
 ## 10 Definition of Done (Entwicklung)
 
 - Code kompiliert, `./gradlew test` grün, keine neuen Lint-Befunde.
-- Fachregeln stimmen mit Anforderungen/AC überein; Hardware-Pfade auf CT37 + RFD8500 geprüft.
+- Fachregeln stimmen mit Anforderungen/AC überein; Hardware-Pfade auf CT37 + RFD8500 **und** CT37 + IH45 geprüft.
 - Strings in EN/DE; Migration + Schema-JSON bei DB-Änderung.
 - Doku (`docs/confluence/`) aktualisiert – mindestens Seiten 03 (Anforderungen), 09 (Test), 15 (Änderungshistorie) und je nach Änderung 04/05/06/07.

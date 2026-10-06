@@ -7,4 +7,5 @@ sealed class Screen(val route: String) {
     data object Reader : Screen("reader")
     data object Language : Screen("language")
     data object About : Screen("about")
+    data object Ih45Diagnostics : Screen("ih45diag")
 }

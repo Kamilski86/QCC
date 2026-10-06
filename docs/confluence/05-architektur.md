@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Stand** | 2026-10-01 |
-| **Quellen** | Code unter `app/src/main/java/de/ca/qcc/`, `CLAUDE.md`, `AGENTS.md`, Design-Spec Duplicate Finder |
+| **Quellen** | Code unter `app/src/main/java/de/ca/qcc/`, `CLAUDE.md`, `AGENTS.md`, Design-Spec Duplicate Finder, Hardware-Abnahme IH45 (2026-10-01) |
 | **Verwandte Seiten** | [06 Datenmodell](06-datenmodell.md), [07 Schnittstellen und Hardware](07-schnittstellen-und-hardware.md), [12 Architekturentscheidungen](12-architekturentscheidungen.md) |
 
 ## 1 Architekturziele und Leitprinzipien
@@ -25,6 +25,7 @@ flowchart LR
     OP[Anwender] --> APP[QCC App]
     CT37[Honeywell CT37 AIDC-SDK] --> APP
     RFD[Zebra RFD8500 RFID API3 SDK via Bluetooth] --> APP
+    IH45[Honeywell IH45 Honeywell RFID SDK via USB] --> APP
     APP --> DB[(Room / SQLite qcc.db)]
     APP --> CSV[CSV in Documents via MediaStore]
     APP --> PREF[(SharedPreferences duplicate_search)]
@@ -41,6 +42,7 @@ flowchart TB
       DS[DashboardScreen]
       DUS[DuplicateSearchScreen / ProximityGauge]
       OTH[Reader / Language / About Screens]
+      DIAG[Ih45DiagnosticScreen temporär]
       SVM[ScanViewModel]
       DVM[DashboardViewModel]
       EVM[ExportViewModel]
@@ -59,7 +61,9 @@ flowchart TB
     end
     subgraph Device
       HG[HoneywellCt37ScannerGateway]
+      SW[SwitchingRfidReaderGateway]
       ZG[ZebraRfd8500Gateway]
+      IG[HoneywellIh45Gateway]
       ARB[TriggerModeArbiter]
     end
     subgraph Core
@@ -69,16 +73,20 @@ flowchart TB
     SVM --> UC --> MR --> ROOM
     SVM --> GS1
     SVM --> HG
-    SVM --> ZG
+    SVM --> SW
     DVM --> MR
     EVM --> MR
     DUVM --> GS1
-    DUVM --> ZG
+    DUVM --> SW
     DUVM --> DR --> ROOM
     DR --> CW
     MR --> CW
     DUVM --> SP
+    SW --> ZG
+    SW --> IG
     ZG --> ARB
+    IG --> ARB
+    DIAG --> IG
 ```
 
 ### Paketstruktur
@@ -93,6 +101,7 @@ de.ca.qcc
 │   ├── export/     ExportViewModel
 │   ├── duplicates/ DuplicateSearchScreen, DuplicateSearchViewModel, ProximityGauge, ProximityFeedback
 │   ├── reader/     ReaderConfigScreen
+│   ├── diagnostics/ Ih45DiagnosticScreen, Ih45DiagnosticViewModel, Ih45Probe (temporär)
 │   ├── language/   LanguageScreen
 │   └── about/      AboutScreen
 ├── domain/
@@ -103,8 +112,8 @@ de.ca.qcc
 │   ├── repository/ MismatchRepository, DuplicateSearchRepository
 │   └── export/     CsvDocumentWriter (+ MediaStore-Implementierung, csvEscape)
 ├── device/
-│   ├── honeywell/  BarcodeScannerGateway, HoneywellCt37ScannerGateway
-│   └── zebra/      RfidReaderGateway, TriggerMode, TriggerModeArbiter, ZebraRfd8500Gateway
+│   ├── honeywell/  BarcodeScannerGateway, HoneywellCt37ScannerGateway, HoneywellIh45Gateway
+│   └── zebra/      RfidReaderGateway, TriggerMode, TriggerModeArbiter, ZebraRfd8500Gateway, SwitchingRfidReaderGateway
 ├── core/gs1/       Gs1ParserService
 ├── di/             AppModule, GatewayModule
 └── ui/theme/       QccTheme
@@ -114,7 +123,7 @@ de.ca.qcc
 
 | Baustein | Verantwortung |
 |---|---|
-| `MainActivity` | Compose-Wurzel, `NavHost`, Drawer; erzeugt die **NavHost-weiten** ViewModels (`ScanViewModel`, `DashboardViewModel`, `ExportViewModel`); Honeywell-Lifecycle (`onResume` → `claim`, `onPause` → `release`, `onDestroy` → `close`); Bluetooth-Berechtigungsanfrage; pausiert `ScanViewModel` auf der Duplicates-Route; Keyboard-Modus nur im Duplicate Finder `ADJUST_RESIZE` |
+| `MainActivity` | Compose-Wurzel, `NavHost`, Drawer; erzeugt die **NavHost-weiten** ViewModels (`ScanViewModel`, `DashboardViewModel`, `ExportViewModel`); Honeywell-Lifecycle (`onResume` → `claim`, `onPause` → `release`, `onDestroy` → `close`); Bluetooth-Berechtigungsanfrage; zeigt `ReaderConnectionIndicator` (Antennen-Icon oben rechts, Toast beim Verbinden/Trennen); pausiert `ScanViewModel` auf der Duplicates-Route; Keyboard-Modus nur im Duplicate Finder `ADJUST_RESIZE` |
 | `ScanViewModel` | QCC-Zyklus: empfängt QR/EPC/Trigger, `startNewCycleIfNeeded`, `compareIfReady`, Ton/Vibration, Reader-Auto-Connect, Fehlertexte; **ignoriert Ereignisse, solange `suspended`** |
 | `CompareScansUseCase` | Vergleich (Normalisierung, Match-Regel) und Persistenz (`scans`, ggf. `mismatches`) |
 | `Gs1ParserService` | QR, manuelle GTIN, SGTIN-96-EPC → SGTIN/GTIN; SGTIN-Kurzformat → EPC-Hex; `parseLocateTarget`, `encodeSgtin96` |
@@ -122,10 +131,12 @@ de.ca.qcc
 | `DuplicateSearchRepository` | Suchen/Funde (transaktional), offene Suche laden, `finishSearch` (idempotent, CSV vor Abschluss), `registerFind`-Regeln |
 | `DuplicateSearchViewModel` | Zustand beider Phasen, Live-Auswertung der Eingabe, Confirm-Logik, Meldungen (`DuplicateMessage`), Trigger-Besitz, Locate-Serialisierung per `Mutex`; **destination-scoped** |
 | `ProximityFeedback` (`ToneProximityFeedback`) | Beep-Schleife (`ToneGenerator`) und Vibration abhängig von der Nähe; Besitzer ruft `release()` |
+| `SwitchingRfidReaderGateway` | an `RfidReaderGateway` gebunden; genau ein Reader gleichzeitig (IH45 per USB hat Vorrang, sonst Zebra); alle Flows folgen dem aktiven Reader; Neuwahl beim An-/Abstecken (ADR-20) |
 | `ZebraRfd8500Gateway` | Discovery, Connect, Konfiguration, Einzel-Tag-Inventory (QCC), Trigger-Modi, Ortung, Nahbereichs-Lesen (EPC/TID), Leistung |
+| `HoneywellIh45Gateway` | USB-Anbindung über das Honeywell RFID SDK; QCC (stärkstes Tag nach RSSI), Tag übernehmen/Bestätigen per RSSI-Auswahl, Ortung per RSSI mit Leistungsstufen; immer volle Leistung (Seite 07, Abschnitt 3a) |
 | `HoneywellCt37ScannerGateway` | AIDC-Scanner im Client-Control-Modus; Trigger → decode; Ergebnis → `SharedFlow` |
 | `TriggerModeArbiter` | Besitzer-Logik für den Trigger-Modus |
-| `AppModule`/`GatewayModule` | Hilt-Bindings (DB `qcc.db` mit Migrationen 1→8, Repositories, Gateways als `@Singleton`, `CsvDocumentWriter`, `ProximityFeedback`) |
+| `AppModule`/`GatewayModule` | Hilt-Bindings (DB `qcc.db` mit Migrationen 1→8, Repositories, Gateways als `@Singleton`, `RfidReaderGateway` → `SwitchingRfidReaderGateway`, `CsvDocumentWriter`, `ProximityFeedback`) |
 
 ## 5 Laufzeitsichten
 
@@ -134,7 +145,7 @@ de.ca.qcc
 ```mermaid
 sequenceDiagram
     participant U as Anwender
-    participant Z as ZebraRfd8500Gateway
+    participant Z as RFID-Reader (ZebraRfd8500Gateway oder HoneywellIh45Gateway)
     participant H as HoneywellCt37ScannerGateway
     participant VM as ScanViewModel
     participant P as Gs1ParserService
@@ -142,7 +153,7 @@ sequenceDiagram
     participant R as MismatchRepository
 
     U->>Z: Trigger drücken
-    Z->>Z: Modus QCC: startInventoryInternal()
+    Z->>Z: Modus QCC: startInventoryInternal() (IH45: stärkstes Tag nach RSSI, 400 ms)
     Z-->>VM: observeTriggerEvents (Unit)
     VM->>VM: startNewCycleIfNeeded()
     VM->>H: triggerScan() (aim/light/decode)
@@ -171,7 +182,7 @@ Der Pistolen-Trigger wird **im Gateway** nach `TriggerMode` verteilt:
 | `CAPTURE` (Duplicates, Phase 1) | `observeHandheldTrigger(true)` → Anlesen | `observeHandheldTrigger(false)` | `DuplicateSearchViewModel` |
 | `LOCATE` (Duplicates, Phase 2) | `observeHandheldTrigger(true)` → Ortung starten | `…(false)` → Ortung stoppen (nicht bei Continuous) | `DuplicateSearchViewModel` |
 
-`eventReadNotify` verzweigt zusätzlich nach laufender Operation: **Nearby-Lesen** (`nearbySink`) vor **Ortung** (`locateActive`, Nähewerte → `proximityFlow`) vor **QCC-Single-Tag** (`inventoryActive`, `compareAndSet` für Genau-einmal-Zustellung).
+Das Routing gilt für beide Reader (beim IH45 kommt der Trigger als `onRfidTriggered(pressed)` im SDK-Triggermodus RFID). `eventReadNotify` (Zebra) verzweigt zusätzlich nach laufender Operation: **Nearby-Lesen** (`nearbySink`) vor **Ortung** (`locateActive`, Nähewerte → `proximityFlow`) vor **QCC-Single-Tag** (`inventoryActive`, `compareAndSet` für Genau-einmal-Zustellung).
 
 ### 5.3 Besitz des Trigger-Modus (Isolation zwischen Use Cases)
 
@@ -179,7 +190,7 @@ Der Pistolen-Trigger wird **im Gateway** nach `TriggerMode` verteilt:
 sequenceDiagram
     participant D1 as DuplicateSearchViewModel (alt)
     participant A as TriggerModeArbiter
-    participant G as ZebraRfd8500Gateway
+    participant G as RFID-Gateway (Switching)
     participant D2 as DuplicateSearchViewModel (neu)
 
     D1->>G: claimTriggerMode(D1, CAPTURE)
@@ -197,17 +208,69 @@ sequenceDiagram
 
 Zusätzlich: Das Duplicates-Composable meldet `onScreenStarted()` (ON_START) bzw. `onScreenStopped()` (ON_STOP/Dispose, idempotent); `startLocating()` prüft `screenActive`. `MainActivity` setzt `ScanViewModel.setSuspended(true)` solange `currentRoute == duplicates`.
 
+### 5.3a Duplikatsuche im Gesamtablauf
+
+**Grundprinzip: Suchkriterium ist die EPC, Zählkriterium ist die TID.** Gesucht werden Tags mit **genau der vorgegebenen EPC** (`LocateTarget`, immer `FULL_MASK`, also exakter Treffer). Ein Duplikat ist ein weiteres Tag mit derselben EPC. Die **TID** (Chip-Seriennummer) ist kein Suchkriterium, sie unterscheidet nur, ob zwei Funde zwei verschiedene Chips sind oder derselbe Chip zweimal (Datenmodell: ein Fund pro TID und Suche). Die App sucht **nicht** „das Tag mit dem stärksten Signal“; die Signalstärke (RSSI) dient nur dazu, die Nähe des gesuchten Tags anzuzeigen und bei Capture/Confirm das Tag „am Reader“ zu bestimmen.
+
+| Phase | Trigger-Modus | Ablauf |
+|---|---|---|
+| 1 Ziel festlegen | `CAPTURE` | EPC/SGTIN eintippen oder per Trigger von einem Tag übernehmen (`captureFromReader` → `readEpcsNearby`). Beim Übernehmen zählt das Tag mit dem stärksten RSSI (IH45: mindestens −50 dBm) plus alle Tags innerhalb 5 dB davon (`selectClosest`; Zebra liest bei 5 % Leistung). Genau 1 Tag wird übernommen, 0 oder mehrere ergeben eine Meldung. `Gs1ParserService.parseLocateTarget` erzeugt das `LocateTarget`. |
+| 2 Suchen | `LOCATE` | Trigger halten: `startLocate(epc, mask)`; das Gateway meldet die Nähe (0–100 %) über `observeProximity()`, `ProximityFeedback` und `ProximityGauge` geben Ton, Vibration und Anzeige aus. |
+| 3 Fund bestätigen | `LOCATE` | Trigger loslassen mit Nähe ≥ 95 % in den letzten 600 ms (ADR-21), Ablauf siehe 5.4. |
+| 4 Abschluss | – | `endSearch` → `finishSearch` schreibt die CSV und schließt die Suche (idempotent, bei Fehler wiederholbar). |
+
+```mermaid
+sequenceDiagram
+    participant U as Anwender
+    participant VM as DuplicateSearchViewModel
+    participant G as RFID-Gateway (Switching)
+    participant R as DuplicateSearchRepository
+
+    Note over U,G: Phase 1 · CAPTURE (Suchkriterium = EPC)
+    U->>VM: EPC eintippen oder Trigger am Tag
+    VM->>G: readEpcsNearby()
+    G-->>VM: EPCs am Reader (stärkster RSSI + 5 dB)
+    VM->>VM: genau 1 EPC → LocateTarget(epc, FULL_MASK)
+    U->>VM: Start search
+    VM->>R: startSearch(target, store)
+
+    Note over U,G: Phase 2 · LOCATE (Nähe aus RSSI der gesuchten EPC)
+    U->>VM: Trigger halten
+    VM->>G: startLocate(epc, FULL_MASK)
+    loop solange der Trigger gehalten wird
+        G-->>VM: observeProximity() 0–100 %
+        VM-->>U: Ton, Vibration, Anzeige
+    end
+
+    Note over U,R: Phase 3 · Fund (Zählkriterium = TID)
+    U->>VM: Trigger loslassen (Nähe ≥ 95 % in 600 ms)
+    VM->>G: stopLocate(), readTidsNearby(epc, FULL_MASK)
+    G-->>VM: TID des Tags am Reader
+    VM->>R: registerFind(searchId, tid)
+    R-->>VM: Saved | AlreadyInSearch
+
+    Note over U,R: Phase 4 · Abschluss
+    U->>VM: End search
+    VM->>R: finishSearch(searchId) → CSV
+```
+
+Die Nähe entsteht je nach Reader unterschiedlich, hinter derselben Schnittstelle `RfidReaderGateway`:
+- **Zebra RFD8500:** SDK-Funktion `TagLocationing` liefert die relative Distanz fertig; das Gateway reicht sie durch (Seite 07 §3.5).
+- **Honeywell IH45:** kein SDK-Locate; das Gateway berechnet die Nähe aus dem RSSI **der gesuchten EPC** und senkt im Nahfeld, wo der RSSI sättigt, die Sendeleistung stufenweise (Seite 07 §3a.4, ADR-20).
+
+Bedienprinzip (beide Hände belegt, ADR-21): Trigger halten = orten, loslassen am Tag = Fund bestätigen, Druck auf einen Dialog = OK. Die ViewModel-Logik kennt nur `RfidReaderGateway`; welcher Reader aktiv ist, entscheidet `SwitchingRfidReaderGateway`.
+
 ### 5.4 „Confirm find“
 
 ```mermaid
 sequenceDiagram
     participant U as Anwender
     participant VM as DuplicateSearchViewModel
-    participant G as ZebraRfd8500Gateway
+    participant G as RFID-Gateway (Switching)
     participant R as DuplicateSearchRepository
     participant UI as Screen
 
-    U->>VM: Confirm find
+    U->>VM: Confirm find (Button) oder Trigger am Tag loslassen (Nähe ≥ 95 % in den letzten 600 ms)
     VM->>VM: busy = true
     VM->>G: stopLocate()
     VM->>G: readTidsNearby(epc, FULL_MASK)
@@ -224,6 +287,8 @@ sequenceDiagram
     U->>UI: OK
     UI->>VM: onMessageDismissed() → ggf. Ortung fortsetzen (Continuous)
 ```
+
+Das Ergebnis wird akustisch über `ProximityFeedback.resultTone(success)` gemeldet (heller Ton = gespeichert, Warnton = alles andere), und ein **Trigger-Druck schließt einen offenen Dialog** wie OK (ADR-21).
 
 ### 5.5 Navigation und ViewModel-Scopes
 
@@ -246,19 +311,19 @@ Navigation: `Splash → Dashboard`; „Find duplicates“ mit `launchSingleTop` 
 
 | Thema | Umsetzung |
 |---|---|
-| Lokalisierung | String-Ressourcen EN/DE/PL; Duplicate-ViewModel liefert typisierte `DuplicateMessage`, die UI lokalisiert (`stringResource`). QCC-ViewModel/UseCase und Reader-Status enthalten noch deutsche Klartexte (Schuld) |
+| Lokalisierung | String-Ressourcen EN/DE; Duplicate-ViewModel liefert typisierte `DuplicateMessage`, die UI lokalisiert (`stringResource`). QCC-ViewModel/UseCase und Reader-Status enthalten noch deutsche Klartexte (Schuld) |
 | Fehlerbehandlung | `Result`/`runCatching` an Gateway-Grenzen; Reader-Fehler werden lesbar gemacht (`readableFailure`); Parser wirft `IllegalArgumentException` mit Text |
-| Logging | Android `Log`, Tag `QccZebra` (Moduswechsel, fehlgeschlagene Inventory-/Locate-Operationen); kein Crash-Reporting |
+| Logging | Android `Log`, Tags `QccZebra` (Moduswechsel, fehlgeschlagene Inventory-/Locate-Operationen), `QccIh45` (IH45-Gateway), `QccCt37` (Scanner-Gateway: `triggerScan`, Barcode gelesen/Fehler), `QccIh45Probe` (Diagnose); kein Crash-Reporting |
 | Theming | `QccTheme` (Material 3); Bildschirme setzen Weiß/Schwarz explizit |
 | Dependency Injection | Hilt; Gateways `@Singleton`; `ProximityFeedback` und `CsvDocumentWriter` nicht singleton-gebunden |
 | Persistenz | Room mit exportiertem Schema (`app/schemas/`), Migrationen 1→8 |
-| Berechtigungen | Bluetooth (Laufzeit), Vibration; weitere im Manifest siehe Seite 11 |
+| Berechtigungen | Bluetooth (Laufzeit), Vibration, `ACCESS_FINE_LOCATION` (nur ≤ API 30); weitere (u. a. aus den SDK-Manifesten) siehe Seite 11 |
 
 ## 8 Qualitätsszenarien
 
 | Attribut | Szenario | Maßnahme / Nachweis |
 |---|---|---|
-| Verfügbarkeit | Reader trennt sich während der Ortung | `DISCONNECTION_EVENT` setzt Flags zurück; ViewModel stoppt Ortung, meldet „Reader not connected“; Funde bereits gespeichert |
+| Verfügbarkeit | Reader trennt sich während der Ortung (Zebra: Bluetooth; IH45: `USB detached`, tritt gelegentlich auf – Auto-Connect verbindet nach erneutem Anstecken, Seite 13 R-15) | `DISCONNECTION_EVENT` setzt Flags zurück; ViewModel stoppt Ortung, meldet „Reader not connected“; Funde bereits gespeichert |
 | Robustheit | Schneller Wechsel Dashboard ↔ Duplicates | Trigger-Besitz, idempotentes `onScreenStopped`, `screenActive`-Guard (Tests) |
 | Datenintegrität | Gleichzeitige Registrierung derselben TID | Transaktion + `UNIQUE(searchId, tid)` + `OnConflictStrategy.IGNORE` |
 | Wiederholbarkeit | Export schlägt fehl | CSV wird **vor** dem Schließen der Suche geschrieben; Wiederholung möglich |
@@ -275,3 +340,5 @@ Navigation: `Splash → Dashboard`; „Find duplicates“ mit `launchSingleTop` 
 | AR-04 | Keine instrumentierten Tests; Gateways (SDK) ungetestet | Hardware-Pfade nur manuell |
 | AR-05 | Routen teils als Strings (`"reader"` …) und Platzhalter-Routen `scan`/`export` | uneinheitlich |
 | AR-06 | App-Titel „QCC“ als Literal in `DashboardScreen` (statt `R.string.app_name`) | blockiert die Umbenennung zu „MV-C“ |
+| AR-07 | Temporäre Diagnose-Ansicht `feature/diagnostics` (nur englisch, zweiter `RfidManager`-Listener) | nach Abnahme entfernen (Seite 13, TD-17) |
+| AR-08 | `HoneywellIh45Gateway` und Switching-Logik nur teilweise testbar (SDK) | Hardware-Pfade manuell (Seite 09) |

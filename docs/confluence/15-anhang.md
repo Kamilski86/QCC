@@ -17,8 +17,9 @@
 | 2026-10-01 | **Aufräumen und Release-Build**: manuelle GTIN, 24 ungenutzte Strings, drei ungenutzte Permissions und zwei ungenutzte Routen entfernt (`f36854b`); R8-Regeln für die Vendor-SDKs, Release-Build läuft (`af94d09`) | `f36854b`, `af94d09` |
 | 2026-10-01 | **Release-Signierung** (Keystore außerhalb des Repos, `keystore.properties`, signierter Build); Korrektur Seite 11 (Berechtigungen aus den SDKs) | folgt |
 | 2026-10-01 | **Vergleich über GTIN + Seriennummer** (Company-Prefix-unabhängig), **Leistungsanzeige** „Level n of 30“, **Polnisch entfernt** (siehe Seiten 03, 10, 12, 13) | folgt |
+| 2026-10-01 | **Honeywell IH45 als zweiter RFID-Reader** (Branch `feature/honeywell-ih45`): USB-Anbindung (Honeywell RFID SDK in `vendor/honeywell/`), `HoneywellIh45Gateway`, `SwitchingRfidReaderGateway`, volle Leistung + RSSI-Auswahl, Ortung mit Leistungsstufen (ADR-20); **Duplikatsuche ohne dritte Hand** (Loslassen am Tag bestätigt, Trigger schließt Dialoge, Bestätigungs-/Warnton, ADR-21); **Reader-Icon und Toast**; Meldung „Kein RFID-Reader gefunden“; temporäre Diagnose-Ansicht; Build: `API3_LLRP` ausgeschlossen, ProGuard-Regeln, `ACCESS_FINE_LOCATION` (≤ API 30); 118 Tests; Dokumentation aktualisiert (Seiten 00–05, 07–14, `CLAUDE.md`) | noch nicht committet |
 
-Stand der Branches: `main` enthält noch **nicht** die Duplicate-Finder-Arbeit; `fix/duplicate-finder-ux` ist auf `feature/duplicate-finder` aufgebaut (rund 30 Commits vor `main`). Merge und Push stehen aus (Seite 13, O-15).
+Stand der Branches: `main` enthält noch **nicht** die Duplicate-Finder-Arbeit; `fix/duplicate-finder-ux` ist auf `feature/duplicate-finder` aufgebaut (rund 30 Commits vor `main`); `feature/honeywell-ih45` baut darauf auf (IH45-Änderungen noch nicht committet). Merge und Push stehen aus (Seite 13, O-15).
 
 ## B Pflege der Dokumentation
 
@@ -34,7 +35,7 @@ Stand der Branches: `main` enthält noch **nicht** die Duplicate-Finder-Arbeit; 
 | Neue/geänderte Funktion, Regel, Meldung | 02, 03 (FR/AC/BR), 04, 09 |
 | Neuer Bildschirm / Navigation | 02, 04, 05, 08 |
 | Datenbank / CSV | 06, 03 (NFR-06), 09, 10 (Release Notes) |
-| Hardware / Gateway / GS1 | 07, 05, 12 (ADR) |
+| Hardware / Gateway / GS1 | 07, 05, 12 (ADR), 03 (Systemgrenzen, FR-09), 04 (Voraussetzungen), 14 |
 | Architekturentscheidung | 12, 05 |
 | Build / Tooling / Umgebung | 08, 10 |
 | Berechtigungen / Datenhaltung | 11 |
@@ -45,7 +46,7 @@ Stand der Branches: `main` enthält noch **nicht** die Duplicate-Finder-Arbeit; 
 - [ ] Anforderungs-IDs und Akzeptanzkriterien aktuell, Traceability-Matrix (Seite 03) angepasst
 - [ ] Testbestand und Zahl der Tests (Seite 09) aktualisiert
 - [ ] Schemaversion/Migrationen (Seiten 00, 06) aktualisiert
-- [ ] Neue Strings in EN/DE/PL, Benutzerhandbuch (Seite 04) angepasst
+- [ ] Neue Strings in EN/DE (Polnisch entfällt seit 2026-10-01), Benutzerhandbuch (Seite 04) angepasst
 - [ ] Offene Punkte/Risiken (Seite 13) und Glossar (Seite 14) geprüft
 - [ ] Änderungshistorie (Anhang A) ergänzt
 
@@ -89,8 +90,8 @@ Fachliche Inhalte: Product Owner **[zu bestätigen]**; technische Inhalte: Entwi
 
 ## E Quellen
 
-- Code: `app/src/main/java/de/ca/qcc/`, `app/src/test/java/de/ca/qcc/`, `app/build.gradle.kts`, `AndroidManifest.xml`, `app/schemas/`
+- Code: `app/src/main/java/de/ca/qcc/`, `app/src/test/java/de/ca/qcc/`, `app/build.gradle.kts`, `app/proguard-rules.pro`, `AndroidManifest.xml`, `app/schemas/`, `vendor/honeywell/`
 - Repository-Dokumente: `README.md`, `SETUP.md`, `CLAUDE.md`, `AGENTS.md`, `docs/`, `tasks/todo.md`, `agents/`
-- Hardware-Spike und Abnahme: Design-Spec (Abschnitt 10) und Rückmeldungen des Anwenders (2026-09-30, 2026-10-01)
+- Hardware-Spike und Abnahme: Design-Spec (Abschnitt 10) und Rückmeldungen des Anwenders (2026-09-30, 2026-10-01); IH45-Befunde und -Parameter aus der Hardware-Abnahme vom 2026-10-01 (CT37 + IH45 + RFD8500)
 - Git-Historie (`git log`), Build-/Testläufe vom 2026-10-01 (`assembleDebug`, `testDebugUnitTest`, `assembleRelease`)
 - Externe Standards: GS1 General Specifications, GS1 EPC Tag Data Standard (SGTIN-96), GS1 EPCIS 2.0
