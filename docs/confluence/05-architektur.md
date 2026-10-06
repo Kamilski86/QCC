@@ -208,6 +208,58 @@ sequenceDiagram
 
 Zusätzlich: Das Duplicates-Composable meldet `onScreenStarted()` (ON_START) bzw. `onScreenStopped()` (ON_STOP/Dispose, idempotent); `startLocating()` prüft `screenActive`. `MainActivity` setzt `ScanViewModel.setSuspended(true)` solange `currentRoute == duplicates`.
 
+### 5.3a Duplikatsuche im Gesamtablauf
+
+**Grundprinzip: Suchkriterium ist die EPC, Zählkriterium ist die TID.** Gesucht werden Tags mit **genau der vorgegebenen EPC** (`LocateTarget`, immer `FULL_MASK`, also exakter Treffer). Ein Duplikat ist ein weiteres Tag mit derselben EPC. Die **TID** (Chip-Seriennummer) ist kein Suchkriterium, sie unterscheidet nur, ob zwei Funde zwei verschiedene Chips sind oder derselbe Chip zweimal (Datenmodell: ein Fund pro TID und Suche). Die App sucht **nicht** „das Tag mit dem stärksten Signal“; die Signalstärke (RSSI) dient nur dazu, die Nähe des gesuchten Tags anzuzeigen und bei Capture/Confirm das Tag „am Reader“ zu bestimmen.
+
+| Phase | Trigger-Modus | Ablauf |
+|---|---|---|
+| 1 Ziel festlegen | `CAPTURE` | EPC/SGTIN eintippen oder per Trigger von einem Tag übernehmen (`captureFromReader` → `readEpcsNearby`). Beim Übernehmen zählt das Tag mit dem stärksten RSSI (IH45: mindestens −50 dBm) plus alle Tags innerhalb 5 dB davon (`selectClosest`; Zebra liest bei 5 % Leistung). Genau 1 Tag wird übernommen, 0 oder mehrere ergeben eine Meldung. `Gs1ParserService.parseLocateTarget` erzeugt das `LocateTarget`. |
+| 2 Suchen | `LOCATE` | Trigger halten: `startLocate(epc, mask)`; das Gateway meldet die Nähe (0–100 %) über `observeProximity()`, `ProximityFeedback` und `ProximityGauge` geben Ton, Vibration und Anzeige aus. |
+| 3 Fund bestätigen | `LOCATE` | Trigger loslassen mit Nähe ≥ 95 % in den letzten 600 ms (ADR-21), Ablauf siehe 5.4. |
+| 4 Abschluss | – | `endSearch` → `finishSearch` schreibt die CSV und schließt die Suche (idempotent, bei Fehler wiederholbar). |
+
+```mermaid
+sequenceDiagram
+    participant U as Anwender
+    participant VM as DuplicateSearchViewModel
+    participant G as RFID-Gateway (Switching)
+    participant R as DuplicateSearchRepository
+
+    Note over U,G: Phase 1 · CAPTURE (Suchkriterium = EPC)
+    U->>VM: EPC eintippen oder Trigger am Tag
+    VM->>G: readEpcsNearby()
+    G-->>VM: EPCs am Reader (stärkster RSSI + 5 dB)
+    VM->>VM: genau 1 EPC → LocateTarget(epc, FULL_MASK)
+    U->>VM: Start search
+    VM->>R: startSearch(target, store)
+
+    Note over U,G: Phase 2 · LOCATE (Nähe aus RSSI der gesuchten EPC)
+    U->>VM: Trigger halten
+    VM->>G: startLocate(epc, FULL_MASK)
+    loop solange der Trigger gehalten wird
+        G-->>VM: observeProximity() 0–100 %
+        VM-->>U: Ton, Vibration, Anzeige
+    end
+
+    Note over U,R: Phase 3 · Fund (Zählkriterium = TID)
+    U->>VM: Trigger loslassen (Nähe ≥ 95 % in 600 ms)
+    VM->>G: stopLocate(), readTidsNearby(epc, FULL_MASK)
+    G-->>VM: TID des Tags am Reader
+    VM->>R: registerFind(searchId, tid)
+    R-->>VM: Saved | AlreadyInSearch
+
+    Note over U,R: Phase 4 · Abschluss
+    U->>VM: End search
+    VM->>R: finishSearch(searchId) → CSV
+```
+
+Die Nähe entsteht je nach Reader unterschiedlich, hinter derselben Schnittstelle `RfidReaderGateway`:
+- **Zebra RFD8500:** SDK-Funktion `TagLocationing` liefert die relative Distanz fertig; das Gateway reicht sie durch (Seite 07 §3.5).
+- **Honeywell IH45:** kein SDK-Locate; das Gateway berechnet die Nähe aus dem RSSI **der gesuchten EPC** und senkt im Nahfeld, wo der RSSI sättigt, die Sendeleistung stufenweise (Seite 07 §3a.4, ADR-20).
+
+Bedienprinzip (beide Hände belegt, ADR-21): Trigger halten = orten, loslassen am Tag = Fund bestätigen, Druck auf einen Dialog = OK. Die ViewModel-Logik kennt nur `RfidReaderGateway`; welcher Reader aktiv ist, entscheidet `SwitchingRfidReaderGateway`.
+
 ### 5.4 „Confirm find“
 
 ```mermaid

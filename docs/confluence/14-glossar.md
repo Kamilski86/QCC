@@ -14,7 +14,7 @@
 | **Continuous search** | Schalter: Ortung läuft ohne gedrückten Trigger |
 | **CT37** | Honeywell-Handheld (Android) – Host der App und 2D-Scanner |
 | **DataMatrix / QR** | 2D-Codes; im Projekt GS1-konforme Inhalte bzw. QR-URLs mit `/01/<GTIN>/21/<Serial>` |
-| **Duplikat** | RFID-Tag mit **identischem EPC** wie ein anderer (fehlerhafte Codierung durch den Tag-Produzenten) |
+| **Duplikat** | RFID-Tag mit **identischem EPC** wie ein anderer (fehlerhafte Codierung durch den Tag-Produzenten). Gesucht wird über die EPC, unterschieden und gezählt werden Duplikate über die **TID** (verschiedene Chips) |
 | **EPC** | Electronic Product Code; hier SGTIN-96 als 24 Hex-Zeichen |
 | **EPCIS 2.0** | GS1-Standard für Ereignisdaten in der Lieferkette; geplante Integration („Inbound Read“) |
 | **Filterwert** | 3-Bit-Feld im SGTIN-96 (0–7); 1 = Verkaufsartikel (Point-of-Sale Trade Item) |

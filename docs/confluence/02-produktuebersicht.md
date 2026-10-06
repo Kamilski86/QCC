@@ -86,9 +86,18 @@ Ein neuer Scan nach abgeschlossenem Zyklus löscht zuerst QR, RFID, Ergebnis und
 stateDiagram-v2
     [*] --> Ziel: Bildschirm öffnen (keine offene Suche)
     [*] --> Suche: Bildschirm öffnen (offene Suche vorhanden)
-    Ziel --> Suche: Start search (Eingabe gültig, Reader verbunden)
-    Suche --> Suche: Ortung (Trigger halten / Continuous), Confirm find oder Loslassen am Tag
+    Ziel --> Suche: Start search (EPC gültig, Reader verbunden)
     Suche --> Ziel: End search (CSV-Export)
+
+    state Suche {
+        [*] --> Bereit
+        Bereit --> Ortung: Trigger halten / Continuous (Nähe aus RSSI der gesuchten EPC)
+        Ortung --> Bereit: Trigger loslassen, Nähe < 95 %
+        Ortung --> Bestaetigen: Trigger loslassen, Nähe ≥ 95 % oder Confirm find
+        Bestaetigen --> Bereit: TID gespeichert (je TID ein Fund pro Suche) oder Meldung
+    }
 ```
+
+Suchkriterium ist die **EPC**, gezählt wird pro **TID** (verschiedene Chips mit derselben EPC = Duplikate). Gesamtablauf: [05 Architektur](05-architektur.md) §5.3a.
 
 Details zu Ablauf und Meldungen: [04 Benutzerhandbuch](04-benutzerhandbuch.md), Regeln: [03 Anforderungen](03-anforderungen.md).
